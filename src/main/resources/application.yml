@@ -35,6 +35,10 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
+jwt:
+  secret: film-forest-jwt-secret-key-2026-very-long-and-secure
+  expiration: 604800000  # 7天
+
 logging:
   level:
     com.filmforest: debug
