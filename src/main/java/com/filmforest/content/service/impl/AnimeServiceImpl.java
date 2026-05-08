@@ -14,13 +14,32 @@ import org.springframework.stereotype.Service;
 public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements AnimeService {
 
     @Override
-    public IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre) {
+    public IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                  Integer yearFrom, Integer yearTo, String sortDir) {
         Page<Anime> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(year != null, Anime::getYear, year);
+
+        if (year != null) {
+            wrapper.eq(Anime::getYear, year);
+        } else {
+            wrapper.ge(yearFrom != null, Anime::getYear, yearFrom);
+            wrapper.le(yearTo != null, Anime::getYear, yearTo);
+        }
+
         wrapper.like(StringUtils.isNotBlank(region), Anime::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Anime::getGenre, genre);
-        wrapper.orderByDesc(Anime::getCreatedAt);
+
+        boolean isAsc = "asc".equalsIgnoreCase(sortDir);
+        if ("douban".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Anime::getScoreDouban);
+        } else if ("imdb".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Anime::getScoreDouban);
+        } else if ("year".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Anime::getYear);
+        } else {
+            wrapper.orderByDesc(Anime::getCreatedAt);
+        }
+
         return page(page, wrapper);
     }
 

@@ -1,6 +1,5 @@
 package com.filmforest.content.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Drama;
 import com.filmforest.content.service.DramaService;
@@ -20,8 +19,12 @@ public class DramaController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String region,
-            @RequestParam(required = false) String genre) {
-        return Result.ok(dramaService.pageList(page, size, year, region, genre));
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
+        return Result.ok(dramaService.pageList(page, size, year, region, genre, sort, yearFrom, yearTo, sortDir));
     }
 
     @GetMapping("/{id}")

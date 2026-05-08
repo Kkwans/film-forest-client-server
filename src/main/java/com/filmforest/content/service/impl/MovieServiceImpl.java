@@ -14,15 +14,38 @@ import org.springframework.stereotype.Service;
 public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements MovieService {
 
     @Override
-    public IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre) {
+    public IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                  Integer yearFrom, Integer yearTo, String sortDir) {
         Page<Movie> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(year != null, Movie::getYear, year);
-        wrapper.like(StringUtils.isNotBlank(region), Movie::getRegion, region);
-        if (StringUtils.isNotBlank(genre)) {
-            wrapper.like(Movie::getGenre, genre);
+
+        // 年份筛选：精确年份 或 年份范围
+        if (year != null) {
+            wrapper.eq(Movie::getYear, year);
+        } else {
+            wrapper.ge(yearFrom != null, Movie::getYear, yearFrom);
+            wrapper.le(yearTo != null, Movie::getYear, yearTo);
         }
-        wrapper.orderByDesc(Movie::getCreatedAt);
+
+        // 地区筛选（模糊匹配 JSON 字符串）
+        wrapper.like(StringUtils.isNotBlank(region), Movie::getRegion, region);
+
+        // 类型筛选（模糊匹配 JSON 字符串）
+        wrapper.like(StringUtils.isNotBlank(genre), Movie::getGenre, genre);
+
+        // 排序
+        boolean isAsc = "asc".equalsIgnoreCase(sortDir);
+        if ("douban".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Movie::getScoreDouban);
+        } else if ("imdb".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Movie::getScoreImdb);
+        } else if ("year".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Movie::getYear);
+        } else {
+            // 默认按创建时间（最新更新）
+            wrapper.orderByDesc(Movie::getCreatedAt);
+        }
+
         return page(page, wrapper);
     }
 

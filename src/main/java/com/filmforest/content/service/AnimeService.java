@@ -6,7 +6,8 @@ import com.filmforest.content.entity.Anime;
 
 public interface AnimeService extends IService<Anime> {
 
-    IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre);
+    IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                          Integer yearFrom, Integer yearTo, String sortDir);
 
     Anime getDetail(Long id);
 }

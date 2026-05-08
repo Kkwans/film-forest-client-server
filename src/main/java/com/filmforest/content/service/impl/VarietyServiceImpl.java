@@ -14,13 +14,32 @@ import org.springframework.stereotype.Service;
 public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> implements VarietyService {
 
     @Override
-    public IPage<Variety> pageList(int pageNum, int pageSize, Integer year, String region, String genre) {
+    public IPage<Variety> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                    Integer yearFrom, Integer yearTo, String sortDir) {
         Page<Variety> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(year != null, Variety::getYear, year);
+
+        if (year != null) {
+            wrapper.eq(Variety::getYear, year);
+        } else {
+            wrapper.ge(yearFrom != null, Variety::getYear, yearFrom);
+            wrapper.le(yearTo != null, Variety::getYear, yearTo);
+        }
+
         wrapper.like(StringUtils.isNotBlank(region), Variety::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Variety::getGenre, genre);
-        wrapper.orderByDesc(Variety::getCreatedAt);
+
+        boolean isAsc = "asc".equalsIgnoreCase(sortDir);
+        if ("douban".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Variety::getScoreDouban);
+        } else if ("imdb".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Variety::getScoreDouban); // 综艺只有豆瓣
+        } else if ("year".equals(sort)) {
+            wrapper.orderBy(true, isAsc, Variety::getYear);
+        } else {
+            wrapper.orderByDesc(Variety::getCreatedAt);
+        }
+
         return page(page, wrapper);
     }
 

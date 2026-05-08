@@ -6,7 +6,8 @@ import com.filmforest.content.entity.Drama;
 
 public interface DramaService extends IService<Drama> {
 
-    IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre);
+    IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                          Integer yearFrom, Integer yearTo, String sortDir);
 
     Drama getDetail(Long id);
 }

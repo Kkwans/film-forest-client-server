@@ -9,9 +9,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 全局搜索接口
@@ -37,6 +37,7 @@ public class SearchController {
 
     /**
      * 搜索接口（合并电影/剧集/综艺/动漫/短剧）
+     * 使用 SQL 分页查询，避免全表加载到内存
      */
     @GetMapping
     public Result<?> search(
@@ -50,78 +51,103 @@ public class SearchController {
         
         String kw = keyword.trim();
         int from = (page - 1) * size;
+        // 每个表最多查 size 条，避免全表扫描
+        int perTableLimit = Math.max(size, 50);
         
-        // 分散查询各表，取并集后分页
         List<SearchResult> allResults = new ArrayList<>();
         
-        // 电影
-        List<SearchResult> movies = movieService.list(
-                new LambdaQueryWrapper<Movie>()
-                        .like(Movie::getTitle, kw)
-                        .or().like(Movie::getAlias, kw)
-                        .or().like(Movie::getActor, kw)
-                        .or().like(Movie::getDirector, kw)
-        ).stream().limit(50).map(m -> new SearchResult(
-                m.getId(), "movie", m.getTitle(),
-                m.getPosterUrl(), m.getYear(),
-                m.getScoreDouban() != null ? m.getScoreDouban().doubleValue() : null,
-                m.getStoryline()
-        )).collect(Collectors.toList());
-        allResults.addAll(movies);
+        // 电影：标题/别名/演员/导演
+        try {
+            Page<Movie> moviePage = movieService.page(
+                    new Page<>(1, perTableLimit),
+                    new LambdaQueryWrapper<Movie>()
+                            .like(Movie::getTitle, kw)
+                            .or().like(Movie::getAlias, kw)
+                            .or().like(Movie::getActor, kw)
+                            .or().like(Movie::getDirector, kw)
+            );
+            moviePage.getRecords().forEach(m -> allResults.add(new SearchResult(
+                    m.getId(), "movie", m.getTitle(),
+                    m.getPosterUrl(), m.getYear(),
+                    m.getScoreDouban() != null ? m.getScoreDouban().doubleValue() : null,
+                    m.getStoryline()
+            )));
+        } catch (Exception e) {
+            // 搜索失败不影响其他类型
+        }
         
-        // 剧集
-        List<SearchResult> dramas = dramaService.list(
-                new LambdaQueryWrapper<Drama>()
-                        .like(Drama::getTitle, kw)
-                        .or().like(Drama::getAlias, kw)
-                        .or().like(Drama::getActor, kw)
-        ).stream().limit(50).map(d -> new SearchResult(
-                d.getId(), "drama", d.getTitle(),
-                d.getPosterUrl(), d.getYear(),
-                d.getScoreDouban() != null ? d.getScoreDouban().doubleValue() : null,
-                d.getStoryline()
-        )).collect(Collectors.toList());
-        allResults.addAll(dramas);
+        // 剧集：标题/别名/演员
+        try {
+            Page<Drama> dramaPage = dramaService.page(
+                    new Page<>(1, perTableLimit),
+                    new LambdaQueryWrapper<Drama>()
+                            .like(Drama::getTitle, kw)
+                            .or().like(Drama::getAlias, kw)
+                            .or().like(Drama::getActor, kw)
+            );
+            dramaPage.getRecords().forEach(d -> allResults.add(new SearchResult(
+                    d.getId(), "drama", d.getTitle(),
+                    d.getPosterUrl(), d.getYear(),
+                    d.getScoreDouban() != null ? d.getScoreDouban().doubleValue() : null,
+                    d.getStoryline()
+            )));
+        } catch (Exception e) { }
         
-        // 综艺
-        List<SearchResult> varieties = varietyService.list(
-                new LambdaQueryWrapper<Variety>()
-                        .like(Variety::getTitle, kw)
-                        .or().like(Variety::getAlias, kw)
-        ).stream().limit(50).map(v -> new SearchResult(
-                v.getId(), "variety", v.getTitle(),
-                v.getPosterUrl(), v.getYear(),
-                v.getScoreDouban() != null ? v.getScoreDouban().doubleValue() : null,
-                v.getStoryline()
-        )).collect(Collectors.toList());
-        allResults.addAll(varieties);
+        // 综艺：标题/别名
+        try {
+            Page<Variety> varietyPage = varietyService.page(
+                    new Page<>(1, perTableLimit),
+                    new LambdaQueryWrapper<Variety>()
+                            .like(Variety::getTitle, kw)
+                            .or().like(Variety::getAlias, kw)
+            );
+            varietyPage.getRecords().forEach(v -> allResults.add(new SearchResult(
+                    v.getId(), "variety", v.getTitle(),
+                    v.getPosterUrl(), v.getYear(),
+                    v.getScoreDouban() != null ? v.getScoreDouban().doubleValue() : null,
+                    v.getStoryline()
+            )));
+        } catch (Exception e) { }
         
-        // 动漫
-        List<SearchResult> animes = animeService.list(
-                new LambdaQueryWrapper<Anime>()
-                        .like(Anime::getTitle, kw)
-                        .or().like(Anime::getAlias, kw)
-                        .or().like(Anime::getActor, kw)
-        ).stream().limit(50).map(a -> new SearchResult(
-                a.getId(), "anime", a.getTitle(),
-                a.getPosterUrl(), a.getYear(),
-                a.getScoreDouban() != null ? a.getScoreDouban().doubleValue() : null,
-                a.getStoryline()
-        )).collect(Collectors.toList());
-        allResults.addAll(animes);
+        // 动漫：标题/别名/演员
+        try {
+            Page<Anime> animePage = animeService.page(
+                    new Page<>(1, perTableLimit),
+                    new LambdaQueryWrapper<Anime>()
+                            .like(Anime::getTitle, kw)
+                            .or().like(Anime::getAlias, kw)
+                            .or().like(Anime::getActor, kw)
+            );
+            animePage.getRecords().forEach(a -> allResults.add(new SearchResult(
+                    a.getId(), "anime", a.getTitle(),
+                    a.getPosterUrl(), a.getYear(),
+                    a.getScoreDouban() != null ? a.getScoreDouban().doubleValue() : null,
+                    a.getStoryline()
+            )));
+        } catch (Exception e) { }
         
-        // 短剧
-        List<SearchResult> shortDramas = shortDramaService.list(
-                new LambdaQueryWrapper<ShortDrama>()
-                        .like(ShortDrama::getTitle, kw)
-                        .or().like(ShortDrama::getAlias, kw)
-        ).stream().limit(50).map(s -> new SearchResult(
-                s.getId(), "short_drama", s.getTitle(),
-                s.getPosterUrl(), s.getYear(),
-                null,
-                s.getStoryline()
-        )).collect(Collectors.toList());
-        allResults.addAll(shortDramas);
+        // 短剧：标题/别名
+        try {
+            Page<ShortDrama> shortPage = shortDramaService.page(
+                    new Page<>(1, perTableLimit),
+                    new LambdaQueryWrapper<ShortDrama>()
+                            .like(ShortDrama::getTitle, kw)
+                            .or().like(ShortDrama::getAlias, kw)
+            );
+            shortPage.getRecords().forEach(s -> allResults.add(new SearchResult(
+                    s.getId(), "short_drama", s.getTitle(),
+                    s.getPosterUrl(), s.getYear(),
+                    null,
+                    s.getStoryline()
+            )));
+        } catch (Exception e) { }
+        
+        // 按评分降序排序（有评分的优先）
+        allResults.sort((a, b) -> {
+            Double ra = a.rating != null ? a.rating : 0.0;
+            Double rb = b.rating != null ? b.rating : 0.0;
+            return Double.compare(rb, ra);
+        });
         
         // 简单分页
         int total = allResults.size();
@@ -130,7 +156,6 @@ public class SearchController {
                 .limit(size)
                 .collect(Collectors.toList());
         
-        // 封装分页结果
         PageWrap<SearchResult> pageWrap = new PageWrap<>(pageData, total, size);
         return Result.ok(pageWrap);
     }

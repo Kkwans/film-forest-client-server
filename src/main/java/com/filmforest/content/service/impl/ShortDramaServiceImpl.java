@@ -14,13 +14,28 @@ import org.springframework.stereotype.Service;
 public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDrama> implements ShortDramaService {
 
     @Override
-    public IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre) {
+    public IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                       Integer yearFrom, Integer yearTo, String sortDir) {
         Page<ShortDrama> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(year != null, ShortDrama::getYear, year);
+
+        if (year != null) {
+            wrapper.eq(ShortDrama::getYear, year);
+        } else {
+            wrapper.ge(yearFrom != null, ShortDrama::getYear, yearFrom);
+            wrapper.le(yearTo != null, ShortDrama::getYear, yearTo);
+        }
+
         wrapper.like(StringUtils.isNotBlank(region), ShortDrama::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), ShortDrama::getGenre, genre);
-        wrapper.orderByDesc(ShortDrama::getCreatedAt);
+
+        boolean isAsc = "asc".equalsIgnoreCase(sortDir);
+        if ("year".equals(sort)) {
+            wrapper.orderBy(true, isAsc, ShortDrama::getYear);
+        } else {
+            wrapper.orderByDesc(ShortDrama::getCreatedAt);
+        }
+
         return page(page, wrapper);
     }
 

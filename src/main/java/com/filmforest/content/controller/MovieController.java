@@ -1,6 +1,5 @@
 package com.filmforest.content.controller;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Movie;
 import com.filmforest.content.service.MovieService;
@@ -15,7 +14,7 @@ public class MovieController {
     private MovieService movieService;
 
     /**
-     * 电影列表（分页）
+     * 电影列表（分页 + 筛选 + 排序）
      */
     @GetMapping
     public Result<?> list(
@@ -23,8 +22,12 @@ public class MovieController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String region,
-            @RequestParam(required = false) String genre) {
-        return Result.ok(movieService.pageList(page, size, year, region, genre));
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false, defaultValue = "desc") String sortDir) {
+        return Result.ok(movieService.pageList(page, size, year, region, genre, sort, yearFrom, yearTo, sortDir));
     }
 
     /**
