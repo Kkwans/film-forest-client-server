@@ -33,7 +33,7 @@ public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDr
         if ("year".equals(sort)) {
             wrapper.orderBy(true, isAsc, ShortDrama::getYear);
         } else {
-            wrapper.orderByDesc(ShortDrama::getCreatedAt);
+            wrapper.orderByDesc(ShortDrama::getUpdatedAt);
         }
 
         return page(page, wrapper);

@@ -2,9 +2,10 @@ package com.filmforest.content.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.filmforest.content.dto.UserListItemVO;
 import com.filmforest.content.entity.UserMovieList;
-import com.filmforest.content.entity.UserMovieListItem;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -36,9 +37,9 @@ public interface UserMovieListService extends IService<UserMovieList> {
     void deleteList(Long userId, Long listId);
 
     /**
-     * 添加影视到片单
+     * 添加影视到片单（支持评分和备注）
      */
-    void addItem(Long userId, Long listId, Long movieId, String contentType);
+    void addItem(Long userId, Long listId, Long movieId, String contentType, BigDecimal rating, String note);
 
     /**
      * 从片单移除影视
@@ -46,9 +47,9 @@ public interface UserMovieListService extends IService<UserMovieList> {
     void removeItem(Long userId, Long listId, Long movieId, String contentType);
 
     /**
-     * 获取片单内容（分页）
+     * 获取片单内容（分页，包含影视基本信息）
      */
-    IPage<UserMovieListItem> getListItems(Long userId, Long listId, int pageNum, int pageSize);
+    IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize);
 
     /**
      * 查询影视在哪些片单中

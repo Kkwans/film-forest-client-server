@@ -42,8 +42,8 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
         } else if ("year".equals(sort)) {
             wrapper.orderBy(true, isAsc, Movie::getYear);
         } else {
-            // 默认按创建时间（最新更新）
-            wrapper.orderByDesc(Movie::getCreatedAt);
+            // 默认按更新时间（最新更新）
+            wrapper.orderByDesc(Movie::getUpdatedAt);
         }
 
         return page(page, wrapper);

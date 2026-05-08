@@ -2,13 +2,14 @@ package com.filmforest.content.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.dto.UserListItemVO;
 import com.filmforest.content.entity.UserMovieList;
-import com.filmforest.content.entity.UserMovieListItem;
 import com.filmforest.content.service.UserMovieListService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -99,8 +100,15 @@ public class UserMovieListController {
             return Result.fail(400, "movieId 和 contentType 不能为空");
         }
 
+        // 可选参数：评分和备注
+        BigDecimal rating = null;
+        if (params.get("rating") != null) {
+            rating = new BigDecimal(params.get("rating").toString());
+        }
+        String note = (String) params.get("note");
+
         try {
-            userMovieListService.addItem(userId, id, movieId, contentType);
+            userMovieListService.addItem(userId, id, movieId, contentType, rating, note);
             return Result.ok();
         } catch (RuntimeException e) {
             return Result.fail(400, e.getMessage());
@@ -138,7 +146,7 @@ public class UserMovieListController {
                                   @RequestParam(defaultValue = "20") int size) {
         Long userId = (Long) request.getAttribute("userId");
         try {
-            IPage<UserMovieListItem> items = userMovieListService.getListItems(userId, id, page, size);
+            IPage<UserListItemVO> items = userMovieListService.getListItems(userId, id, page, size);
             return Result.ok(items);
         } catch (RuntimeException e) {
             return Result.fail(400, e.getMessage());

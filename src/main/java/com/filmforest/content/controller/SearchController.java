@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -51,7 +50,6 @@ public class SearchController {
         
         String kw = keyword.trim();
         int from = (page - 1) * size;
-        // 每个表最多查 size 条，避免全表扫描
         int perTableLimit = Math.max(size, 50);
         
         List<SearchResult> allResults = new ArrayList<>();
@@ -70,7 +68,15 @@ public class SearchController {
                     m.getId(), "movie", m.getTitle(),
                     m.getPosterUrl(), m.getYear(),
                     m.getScoreDouban() != null ? m.getScoreDouban().doubleValue() : null,
-                    m.getStoryline()
+                    m.getScoreImdb() != null ? m.getScoreImdb().doubleValue() : null,
+                    null,
+                    m.getStoryline(),
+                    m.getDirector(),
+                    m.getActor(),
+                    m.getGenre(),
+                    m.getRegion(),
+                    m.getDuration(),
+                    null
             )));
         } catch (Exception e) {
             // 搜索失败不影响其他类型
@@ -89,7 +95,15 @@ public class SearchController {
                     d.getId(), "drama", d.getTitle(),
                     d.getPosterUrl(), d.getYear(),
                     d.getScoreDouban() != null ? d.getScoreDouban().doubleValue() : null,
-                    d.getStoryline()
+                    d.getScoreImdb() != null ? d.getScoreImdb().doubleValue() : null,
+                    null,
+                    d.getStoryline(),
+                    d.getDirector(),
+                    d.getActor(),
+                    d.getGenre(),
+                    d.getRegion(),
+                    null,
+                    d.getTotalEpisode()
             )));
         } catch (Exception e) { }
         
@@ -105,7 +119,14 @@ public class SearchController {
                     v.getId(), "variety", v.getTitle(),
                     v.getPosterUrl(), v.getYear(),
                     v.getScoreDouban() != null ? v.getScoreDouban().doubleValue() : null,
-                    v.getStoryline()
+                    null, null,
+                    v.getStoryline(),
+                    v.getDirector(),
+                    v.getActor(),
+                    v.getGenre(),
+                    v.getRegion(),
+                    null,
+                    v.getTotalEpisode()
             )));
         } catch (Exception e) { }
         
@@ -122,7 +143,15 @@ public class SearchController {
                     a.getId(), "anime", a.getTitle(),
                     a.getPosterUrl(), a.getYear(),
                     a.getScoreDouban() != null ? a.getScoreDouban().doubleValue() : null,
-                    a.getStoryline()
+                    null,
+                    null,
+                    a.getStoryline(),
+                    a.getDirector(),
+                    a.getActor(),
+                    a.getGenre(),
+                    a.getRegion(),
+                    null,
+                    a.getTotalEpisode()
             )));
         } catch (Exception e) { }
         
@@ -137,8 +166,14 @@ public class SearchController {
             shortPage.getRecords().forEach(s -> allResults.add(new SearchResult(
                     s.getId(), "short_drama", s.getTitle(),
                     s.getPosterUrl(), s.getYear(),
+                    null, null, null,
+                    s.getStoryline(),
                     null,
-                    s.getStoryline()
+                    null,
+                    s.getGenre(),
+                    s.getRegion(),
+                    null,
+                    s.getTotalEpisode()
             )));
         } catch (Exception e) { }
         
@@ -163,12 +198,20 @@ public class SearchController {
     // 内部类：搜索结果
     public record SearchResult(
             Long id,
-            String type,      // movie / drama / variety / anime / short_drama
+            String type,           // movie / drama / variety / anime / short_drama
             String title,
             String cover,
             Integer year,
-            Double rating,
-            String summary
+            Double rating,         // 豆瓣评分
+            Double ratingImdb,     // IMDB评分
+            Double ratingRT,       // 烂番茄评分
+            String summary,
+            String director,       // JSON数组字符串
+            String actor,          // JSON数组字符串
+            String genre,          // JSON数组字符串
+            String region,         // JSON数组字符串
+            Integer duration,      // 时长（分钟）
+            Integer totalEpisode   // 总集数
     ) {}
 
     // 内部类：分页包装

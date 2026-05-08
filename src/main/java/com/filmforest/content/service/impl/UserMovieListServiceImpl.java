@@ -1,18 +1,19 @@
 package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.filmforest.content.entity.UserMovieList;
-import com.filmforest.content.entity.UserMovieListItem;
-import com.filmforest.content.mapper.UserMovieListItemMapper;
-import com.filmforest.content.mapper.UserMovieListMapper;
+import com.filmforest.content.dto.UserListItemVO;
+import com.filmforest.content.entity.*;
+import com.filmforest.content.mapper.*;
 import com.filmforest.content.service.UserMovieListService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -21,6 +22,21 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
     @Autowired
     private UserMovieListItemMapper itemMapper;
+
+    @Autowired
+    private MovieMapper movieMapper;
+
+    @Autowired
+    private DramaMapper dramaMapper;
+
+    @Autowired
+    private VarietyMapper varietyMapper;
+
+    @Autowired
+    private AnimeMapper animeMapper;
+
+    @Autowired
+    private ShortDramaMapper shortDramaMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -43,10 +59,33 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
     @Override
     public List<UserMovieList> getUserLists(Long userId) {
-        return list(new LambdaQueryWrapper<UserMovieList>()
+        List<UserMovieList> lists = list(new LambdaQueryWrapper<UserMovieList>()
                 .eq(UserMovieList::getUserId, userId)
                 .orderByAsc(UserMovieList::getIsDefault)
                 .orderByDesc(UserMovieList::getCreatedAt));
+
+        // 填充每个片单的 item_count
+        if (!lists.isEmpty()) {
+            List<Long> listIds = lists.stream().map(UserMovieList::getId).collect(Collectors.toList());
+            // 批量查询每个片单的条目数量
+            List<Map<String, Object>> counts = itemMapper.selectMaps(
+                    new QueryWrapper<UserMovieListItem>()
+                            .select("list_id as listId", "count(*) as cnt")
+                            .in("list_id", listIds)
+                            .groupBy("list_id")
+            );
+            Map<Long, Integer> countMap = new HashMap<>();
+            for (Map<String, Object> row : counts) {
+                Long listId = ((Number) row.get("listId")).longValue();
+                int cnt = ((Number) row.get("cnt")).intValue();
+                countMap.put(listId, cnt);
+            }
+            for (UserMovieList list : lists) {
+                list.setItemCount(countMap.getOrDefault(list.getId(), 0));
+            }
+        }
+
+        return lists;
     }
 
     @Override
@@ -57,6 +96,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         list.setType("custom");
         list.setDescription(description);
         list.setIsDefault(0);
+        list.setItemCount(0);
         save(list);
         return list;
     }
@@ -96,7 +136,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void addItem(Long userId, Long listId, Long movieId, String contentType) {
+    public void addItem(Long userId, Long listId, Long movieId, String contentType, BigDecimal rating, String note) {
         // 校验片单归属
         UserMovieList list = getById(listId);
         if (list == null || !list.getUserId().equals(userId)) {
@@ -104,18 +144,24 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         }
 
         // 检查是否已存在
-        Long count = itemMapper.selectCount(new LambdaQueryWrapper<UserMovieListItem>()
+        UserMovieListItem existing = itemMapper.selectOne(new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId)
                 .eq(UserMovieListItem::getMovieId, movieId)
                 .eq(UserMovieListItem::getContentType, contentType));
-        if (count > 0) {
-            throw new RuntimeException("该影视已在片单中");
+        if (existing != null) {
+            // 已存在则更新评分和备注
+            if (rating != null) existing.setRating(rating);
+            if (note != null) existing.setNote(note);
+            itemMapper.updateById(existing);
+            return;
         }
 
         UserMovieListItem item = new UserMovieListItem();
         item.setListId(listId);
         item.setMovieId(movieId);
         item.setContentType(contentType);
+        item.setRating(rating);
+        item.setNote(note);
         itemMapper.insert(item);
     }
 
@@ -135,7 +181,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     }
 
     @Override
-    public IPage<UserMovieListItem> getListItems(Long userId, Long listId, int pageNum, int pageSize) {
+    public IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize) {
         // 校验片单归属
         UserMovieList list = getById(listId);
         if (list == null || !list.getUserId().equals(userId)) {
@@ -143,9 +189,79 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         }
 
         Page<UserMovieListItem> page = new Page<>(pageNum, pageSize);
-        return itemMapper.selectPage(page, new LambdaQueryWrapper<UserMovieListItem>()
+        IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId)
                 .orderByDesc(UserMovieListItem::getAddedAt));
+
+        // 转换为 VO，填充影视信息
+        Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
+        voPage.setTotal(itemPage.getTotal());
+        voPage.setRecords(itemPage.getRecords().stream()
+                .map(this::enrichItem)
+                .collect(Collectors.toList()));
+        return voPage;
+    }
+
+    /**
+     * 为片单条目填充影视基本信息
+     */
+    private UserListItemVO enrichItem(UserMovieListItem item) {
+        UserListItemVO vo = new UserListItemVO();
+        vo.setId(item.getId());
+        vo.setListId(item.getListId());
+        vo.setMovieId(item.getMovieId());
+        vo.setContentType(item.getContentType());
+        vo.setAddedAt(item.getAddedAt());
+        vo.setUserRating(item.getRating());
+        vo.setNote(item.getNote());
+
+        // 根据 contentType 查询对应的表
+        String ct = item.getContentType();
+        Long movieId = item.getMovieId();
+
+        if ("movie".equals(ct)) {
+            Movie m = movieMapper.selectById(movieId);
+            if (m != null) {
+                vo.setTitle(m.getTitle());
+                vo.setCover(m.getPosterUrl());
+                vo.setYear(m.getYear());
+                vo.setRating(m.getScoreDouban());
+            }
+        } else if ("drama".equals(ct)) {
+            Drama d = dramaMapper.selectById(movieId);
+            if (d != null) {
+                vo.setTitle(d.getTitle());
+                vo.setCover(d.getPosterUrl());
+                vo.setYear(d.getYear());
+                vo.setRating(d.getScoreDouban());
+            }
+        } else if ("variety".equals(ct)) {
+            Variety v = varietyMapper.selectById(movieId);
+            if (v != null) {
+                vo.setTitle(v.getTitle());
+                vo.setCover(v.getPosterUrl());
+                vo.setYear(v.getYear());
+                vo.setRating(v.getScoreDouban());
+            }
+        } else if ("anime".equals(ct)) {
+            Anime a = animeMapper.selectById(movieId);
+            if (a != null) {
+                vo.setTitle(a.getTitle());
+                vo.setCover(a.getPosterUrl());
+                vo.setYear(a.getYear());
+                vo.setRating(a.getScoreDouban());
+            }
+        } else if ("short_drama".equals(ct)) {
+            ShortDrama s = shortDramaMapper.selectById(movieId);
+            if (s != null) {
+                vo.setTitle(s.getTitle());
+                vo.setCover(s.getPosterUrl());
+                vo.setYear(s.getYear());
+                // short_drama 没有 scoreDouban
+            }
+        }
+
+        return vo;
     }
 
     @Override

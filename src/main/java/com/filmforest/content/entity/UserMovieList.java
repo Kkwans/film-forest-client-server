@@ -20,6 +20,9 @@ public class UserMovieList {
     private String description;     // 描述
     private Integer isDefault;      // 是否默认片单：0=否 1=是
 
+    @TableField(exist = false)
+    private Integer itemCount;         // 片单内影视数量（非数据库字段，查询时填充）
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
