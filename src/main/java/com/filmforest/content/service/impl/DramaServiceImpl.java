@@ -36,7 +36,7 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
         } else if ("year".equals(sort)) {
             wrapper.orderBy(true, isAsc, Drama::getYear);
         } else {
-            wrapper.orderByDesc(Drama::getUpdatedAt);
+            wrapper.orderBy(true, isAsc, Drama::getUpdatedAt);
         }
 
         return page(new Page<>(pageNum, pageSize), wrapper);

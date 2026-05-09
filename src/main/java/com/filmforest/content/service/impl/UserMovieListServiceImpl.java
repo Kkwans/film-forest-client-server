@@ -265,6 +265,27 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateItem(Long userId, Long listId, Long movieId, String contentType, BigDecimal rating, String note) {
+        // 校验片单归属
+        UserMovieList list = getById(listId);
+        if (list == null || !list.getUserId().equals(userId)) {
+            throw new RuntimeException("片单不存在");
+        }
+
+        UserMovieListItem existing = itemMapper.selectOne(new LambdaQueryWrapper<UserMovieListItem>()
+                .eq(UserMovieListItem::getListId, listId)
+                .eq(UserMovieListItem::getMovieId, movieId)
+                .eq(UserMovieListItem::getContentType, contentType));
+        if (existing == null) {
+            throw new RuntimeException("条目不存在");
+        }
+        if (rating != null) existing.setRating(rating);
+        if (note != null) existing.setNote(note);
+        itemMapper.updateById(existing);
+    }
+
+    @Override
     public List<Map<String, Object>> getMovieStatus(Long userId, Long movieId, String contentType) {
         // 获取用户所有片单
         List<UserMovieList> lists = getUserLists(userId);

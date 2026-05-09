@@ -37,7 +37,7 @@ public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> impl
         } else if ("year".equals(sort)) {
             wrapper.orderBy(true, isAsc, Variety::getYear);
         } else {
-            wrapper.orderByDesc(Variety::getUpdatedAt);
+            wrapper.orderBy(true, isAsc, Variety::getUpdatedAt);
         }
 
         return page(page, wrapper);

@@ -37,7 +37,7 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
         } else if ("year".equals(sort)) {
             wrapper.orderBy(true, isAsc, Anime::getYear);
         } else {
-            wrapper.orderByDesc(Anime::getUpdatedAt);
+            wrapper.orderBy(true, isAsc, Anime::getUpdatedAt);
         }
 
         return page(page, wrapper);

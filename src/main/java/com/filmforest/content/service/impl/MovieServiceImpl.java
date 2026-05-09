@@ -43,7 +43,7 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
             wrapper.orderBy(true, isAsc, Movie::getYear);
         } else {
             // 默认按更新时间（最新更新）
-            wrapper.orderByDesc(Movie::getUpdatedAt);
+            wrapper.orderBy(true, isAsc, Movie::getUpdatedAt);
         }
 
         return page(page, wrapper);

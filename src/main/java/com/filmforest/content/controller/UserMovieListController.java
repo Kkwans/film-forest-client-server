@@ -154,6 +154,34 @@ public class UserMovieListController {
     }
 
     /**
+     * 更新片单条目（评分/备注）
+     */
+    @PutMapping("/lists/{id}/items")
+    public Result<?> updateItem(HttpServletRequest request, @PathVariable Long id,
+                                @RequestBody Map<String, Object> params) {
+        Long userId = (Long) request.getAttribute("userId");
+        Long movieId = params.get("movieId") != null ? Long.valueOf(params.get("movieId").toString()) : null;
+        String contentType = (String) params.get("contentType");
+
+        if (movieId == null || contentType == null || contentType.isBlank()) {
+            return Result.fail(400, "movieId 和 contentType 不能为空");
+        }
+
+        java.math.BigDecimal rating = null;
+        if (params.get("rating") != null) {
+            rating = new java.math.BigDecimal(params.get("rating").toString());
+        }
+        String note = (String) params.get("note");
+
+        try {
+            userMovieListService.updateItem(userId, id, movieId, contentType, rating, note);
+            return Result.ok();
+        } catch (RuntimeException e) {
+            return Result.fail(400, e.getMessage());
+        }
+    }
+
+    /**
      * 查询影视在哪些片单中
      */
     @GetMapping("/movie-status")
