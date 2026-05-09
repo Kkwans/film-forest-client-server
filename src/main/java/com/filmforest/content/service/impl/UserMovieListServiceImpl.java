@@ -163,6 +163,20 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         item.setRating(rating);
         item.setNote(note);
         itemMapper.insert(item);
+
+        // 如果添加到在看或看过片单，自动从想看片单中删除
+        if ("watching".equals(list.getType()) || "watched".equals(list.getType())) {
+            UserMovieList wantList = getOne(new LambdaQueryWrapper<UserMovieList>()
+                    .eq(UserMovieList::getUserId, userId)
+                    .eq(UserMovieList::getType, "want_to_watch")
+                    .last("LIMIT 1"));
+            if (wantList != null) {
+                itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
+                        .eq(UserMovieListItem::getListId, wantList.getId())
+                        .eq(UserMovieListItem::getMovieId, movieId)
+                        .eq(UserMovieListItem::getContentType, contentType));
+            }
+        }
     }
 
     @Override
@@ -226,6 +240,11 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setCover(m.getPosterUrl());
                 vo.setYear(m.getYear());
                 vo.setRating(m.getScoreDouban());
+                vo.setRegion(m.getRegion());
+                vo.setGenre(m.getGenre());
+                vo.setDirector(m.getDirector());
+                vo.setActor(m.getActor());
+                vo.setDuration(m.getDuration());
             }
         } else if ("drama".equals(ct)) {
             Drama d = dramaMapper.selectById(movieId);
@@ -234,6 +253,11 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setCover(d.getPosterUrl());
                 vo.setYear(d.getYear());
                 vo.setRating(d.getScoreDouban());
+                vo.setRegion(d.getRegion());
+                vo.setGenre(d.getGenre());
+                vo.setDirector(d.getDirector());
+                vo.setActor(d.getActor());
+                vo.setTotalEpisode(d.getTotalEpisode());
             }
         } else if ("variety".equals(ct)) {
             Variety v = varietyMapper.selectById(movieId);
@@ -242,6 +266,11 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setCover(v.getPosterUrl());
                 vo.setYear(v.getYear());
                 vo.setRating(v.getScoreDouban());
+                vo.setRegion(v.getRegion());
+                vo.setGenre(v.getGenre());
+                vo.setDirector(v.getDirector());
+                vo.setActor(v.getActor());
+                vo.setTotalEpisode(v.getTotalEpisode());
             }
         } else if ("anime".equals(ct)) {
             Anime a = animeMapper.selectById(movieId);
@@ -250,6 +279,11 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setCover(a.getPosterUrl());
                 vo.setYear(a.getYear());
                 vo.setRating(a.getScoreDouban());
+                vo.setRegion(a.getRegion());
+                vo.setGenre(a.getGenre());
+                vo.setDirector(a.getDirector());
+                vo.setActor(a.getActor());
+                vo.setTotalEpisode(a.getTotalEpisode());
             }
         } else if ("short_drama".equals(ct)) {
             ShortDrama s = shortDramaMapper.selectById(movieId);
@@ -257,7 +291,9 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setTitle(s.getTitle());
                 vo.setCover(s.getPosterUrl());
                 vo.setYear(s.getYear());
-                // short_drama 没有 scoreDouban
+                vo.setRegion(s.getRegion());
+                vo.setGenre(s.getGenre());
+                vo.setTotalEpisode(s.getTotalEpisode());
             }
         }
 

@@ -76,7 +76,8 @@ public class SearchController {
                     m.getGenre(),
                     m.getRegion(),
                     m.getDuration(),
-                    null
+                    null,
+                    m.getAlias()
             )));
         } catch (Exception e) {
             // 搜索失败不影响其他类型
@@ -103,7 +104,8 @@ public class SearchController {
                     d.getGenre(),
                     d.getRegion(),
                     null,
-                    d.getTotalEpisode()
+                    d.getTotalEpisode(),
+                    d.getAlias()
             )));
         } catch (Exception e) { }
         
@@ -126,7 +128,8 @@ public class SearchController {
                     v.getGenre(),
                     v.getRegion(),
                     null,
-                    v.getTotalEpisode()
+                    v.getTotalEpisode(),
+                    v.getAlias()
             )));
         } catch (Exception e) { }
         
@@ -151,7 +154,8 @@ public class SearchController {
                     a.getGenre(),
                     a.getRegion(),
                     null,
-                    a.getTotalEpisode()
+                    a.getTotalEpisode(),
+                    a.getAlias()
             )));
         } catch (Exception e) { }
         
@@ -173,7 +177,8 @@ public class SearchController {
                     s.getGenre(),
                     s.getRegion(),
                     null,
-                    s.getTotalEpisode()
+                    s.getTotalEpisode(),
+                    s.getAlias()
             )));
         } catch (Exception e) { }
         
@@ -211,7 +216,8 @@ public class SearchController {
             String genre,          // JSON数组字符串
             String region,         // JSON数组字符串
             Integer duration,      // 时长（分钟）
-            Integer totalEpisode   // 总集数
+            Integer totalEpisode,  // 总集数
+            String alias           // 别名（JSON数组字符串）
     ) {}
 
     // 内部类：分页包装
