@@ -23,4 +23,19 @@ public class MybatisPlusConfig {
         interceptor.addInnerInterceptor(new PaginationInnerInterceptor(DbType.MYSQL));
         return interceptor;
     }
+
+    @Component
+    public static class AutoFillHandler implements MetaObjectHandler {
+        @Override
+        public void insertFill(MetaObject metaObject) {
+            this.strictInsertFill(metaObject, "addedAt", LocalDateTime::now, LocalDateTime.class);
+            this.strictInsertFill(metaObject, "updatedAt", LocalDateTime::now, LocalDateTime.class);
+            this.strictInsertFill(metaObject, "createdAt", LocalDateTime::now, LocalDateTime.class);
+        }
+
+        @Override
+        public void updateFill(MetaObject metaObject) {
+            this.strictUpdateFill(metaObject, "updatedAt", LocalDateTime::now, LocalDateTime.class);
+        }
+    }
 }
