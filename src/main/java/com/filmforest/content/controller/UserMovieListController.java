@@ -143,10 +143,12 @@ public class UserMovieListController {
     @GetMapping("/lists/{id}/items")
     public Result<?> getListItems(HttpServletRequest request, @PathVariable Long id,
                                   @RequestParam(defaultValue = "1") int page,
-                                  @RequestParam(defaultValue = "20") int size) {
+                                  @RequestParam(defaultValue = "20") int size,
+                                  @RequestParam(defaultValue = "addedAt") String sort,
+                                  @RequestParam(defaultValue = "desc") String sortDir) {
         Long userId = (Long) request.getAttribute("userId");
         try {
-            IPage<UserListItemVO> items = userMovieListService.getListItems(userId, id, page, size);
+            IPage<UserListItemVO> items = userMovieListService.getListItems(userId, id, page, size, sort, sortDir);
             return Result.ok(items);
         } catch (RuntimeException e) {
             return Result.fail(400, e.getMessage());
@@ -191,5 +193,20 @@ public class UserMovieListController {
         Long userId = (Long) request.getAttribute("userId");
         List<Map<String, Object>> status = userMovieListService.getMovieStatus(userId, movieId, contentType);
         return Result.ok(status);
+    }
+
+    /**
+     * 批量查询影视在哪些片单中
+     */
+    @GetMapping("/movie-status-batch")
+    public Result<?> getMovieStatusBatch(HttpServletRequest request,
+                                         @RequestParam List<Long> movieIds,
+                                         @RequestParam String contentType) {
+        Long userId = (Long) request.getAttribute("userId");
+        Map<Long, List<Map<String, Object>>> result = new java.util.HashMap<>();
+        for (Long movieId : movieIds) {
+            result.put(movieId, userMovieListService.getMovieStatus(userId, movieId, contentType));
+        }
+        return Result.ok(result);
     }
 }

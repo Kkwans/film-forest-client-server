@@ -42,7 +42,9 @@ public class SearchController {
     public Result<?> search(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(defaultValue = "desc") String sortDir) {
         
         if (keyword == null || keyword.trim().isEmpty()) {
             return Result.fail("关键词不能为空");
@@ -69,7 +71,7 @@ public class SearchController {
                     m.getPosterUrl(), m.getYear(),
                     m.getScoreDouban() != null ? m.getScoreDouban().doubleValue() : null,
                     m.getScoreImdb() != null ? m.getScoreImdb().doubleValue() : null,
-                    null,
+                    m.getScoreRt() != null ? m.getScoreRt().doubleValue() : null,
                     m.getStoryline(),
                     m.getDirector(),
                     m.getActor(),
@@ -182,11 +184,38 @@ public class SearchController {
             )));
         } catch (Exception e) { }
         
-        // 按评分降序排序（有评分的优先）
+        // 根据 sort 参数排序
+        boolean desc = "desc".equalsIgnoreCase(sortDir);
         allResults.sort((a, b) -> {
-            Double ra = a.rating != null ? a.rating : 0.0;
-            Double rb = b.rating != null ? b.rating : 0.0;
-            return Double.compare(rb, ra);
+            int cmp = 0;
+            switch (sort) {
+                case "year":
+                    int ya = a.year != null ? a.year : 0;
+                    int yb = b.year != null ? b.year : 0;
+                    cmp = Integer.compare(ya, yb);
+                    break;
+                case "douban":
+                    double da = a.rating != null ? a.rating : 0;
+                    double db = b.rating != null ? b.rating : 0;
+                    cmp = Double.compare(da, db);
+                    break;
+                case "imdb":
+                    double ia = a.ratingImdb != null ? a.ratingImdb : 0;
+                    double ib = b.ratingImdb != null ? b.ratingImdb : 0;
+                    cmp = Double.compare(ia, ib);
+                    break;
+                case "rt":
+                    double ra = a.ratingRT != null ? a.ratingRT : 0;
+                    double rb = b.ratingRT != null ? b.ratingRT : 0;
+                    cmp = Double.compare(ra, rb);
+                    break;
+                default: // latest - 按评分降序（默认）
+                    double la = a.rating != null ? a.rating : 0;
+                    double lb = b.rating != null ? b.rating : 0;
+                    cmp = Double.compare(la, lb);
+                    break;
+            }
+            return desc ? -cmp : cmp;
         });
         
         // 简单分页

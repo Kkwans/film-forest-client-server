@@ -164,7 +164,9 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         item.setNote(note);
         itemMapper.insert(item);
 
-        // 如果添加到在看或看过片单，自动从想看片单中删除
+        // 互斥逻辑：
+        // 1. 添加到在看/看过 → 自动从想看删除
+        // 2. 添加到看过 → 自动从在看删除
         if ("watching".equals(list.getType()) || "watched".equals(list.getType())) {
             UserMovieList wantList = getOne(new LambdaQueryWrapper<UserMovieList>()
                     .eq(UserMovieList::getUserId, userId)
@@ -173,6 +175,18 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (wantList != null) {
                 itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
                         .eq(UserMovieListItem::getListId, wantList.getId())
+                        .eq(UserMovieListItem::getMovieId, movieId)
+                        .eq(UserMovieListItem::getContentType, contentType));
+            }
+        }
+        if ("watched".equals(list.getType())) {
+            UserMovieList watchingList = getOne(new LambdaQueryWrapper<UserMovieList>()
+                    .eq(UserMovieList::getUserId, userId)
+                    .eq(UserMovieList::getType, "watching")
+                    .last("LIMIT 1"));
+            if (watchingList != null) {
+                itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
+                        .eq(UserMovieListItem::getListId, watchingList.getId())
                         .eq(UserMovieListItem::getMovieId, movieId)
                         .eq(UserMovieListItem::getContentType, contentType));
             }
@@ -195,24 +209,62 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     }
 
     @Override
-    public IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize) {
+    public IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize, String sort, String sortDir) {
         // 校验片单归属
         UserMovieList list = getById(listId);
         if (list == null || !list.getUserId().equals(userId)) {
             throw new RuntimeException("片单不存在");
         }
 
+        boolean desc = "desc".equalsIgnoreCase(sortDir);
+
+        // 对于 item 表字段的排序（addedAt, userRating），直接在 SQL 层排序
+        if ("addedAt".equals(sort) || "userRating".equals(sort)) {
+            Page<UserMovieListItem> page = new Page<>(pageNum, pageSize);
+            LambdaQueryWrapper<UserMovieListItem> wrapper = new LambdaQueryWrapper<UserMovieListItem>()
+                    .eq(UserMovieListItem::getListId, listId);
+            if ("addedAt".equals(sort)) {
+                wrapper = desc ? wrapper.orderByDesc(UserMovieListItem::getAddedAt) : wrapper.orderByAsc(UserMovieListItem::getAddedAt);
+            } else {
+                wrapper = desc ? wrapper.orderByDesc(UserMovieListItem::getRating) : wrapper.orderByAsc(UserMovieListItem::getRating);
+            }
+            IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, wrapper);
+            Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
+            voPage.setTotal(itemPage.getTotal());
+            voPage.setRecords(itemPage.getRecords().stream().map(this::enrichItem).collect(Collectors.toList()));
+            return voPage;
+        }
+
+        // 对于内容表字段的排序（year, douban），先查所有 items 再在 VO 层排序
         Page<UserMovieListItem> page = new Page<>(pageNum, pageSize);
         IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, new LambdaQueryWrapper<UserMovieListItem>()
-                .eq(UserMovieListItem::getListId, listId)
-                .orderByDesc(UserMovieListItem::getAddedAt));
+                .eq(UserMovieListItem::getListId, listId));
 
-        // 转换为 VO，填充影视信息
+        List<UserListItemVO> voList = itemPage.getRecords().stream().map(this::enrichItem).collect(Collectors.toList());
+
+        // 在 VO 层排序
+        voList.sort((a, b) -> {
+            int cmp = 0;
+            switch (sort) {
+                case "year":
+                    int ya = a.getYear() != null ? a.getYear() : 0;
+                    int yb = b.getYear() != null ? b.getYear() : 0;
+                    cmp = Integer.compare(ya, yb);
+                    break;
+                case "douban":
+                    double da = a.getRating() != null ? a.getRating().doubleValue() : 0;
+                    double db = b.getRating() != null ? b.getRating().doubleValue() : 0;
+                    cmp = Double.compare(da, db);
+                    break;
+                default:
+                    cmp = 0;
+            }
+            return desc ? -cmp : cmp;
+        });
+
         Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
         voPage.setTotal(itemPage.getTotal());
-        voPage.setRecords(itemPage.getRecords().stream()
-                .map(this::enrichItem)
-                .collect(Collectors.toList()));
+        voPage.setRecords(voList);
         return voPage;
     }
 
