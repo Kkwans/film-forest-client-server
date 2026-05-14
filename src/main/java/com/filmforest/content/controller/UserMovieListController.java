@@ -203,10 +203,7 @@ public class UserMovieListController {
                                          @RequestParam List<Long> movieIds,
                                          @RequestParam String contentType) {
         Long userId = (Long) request.getAttribute("userId");
-        Map<Long, List<Map<String, Object>>> result = new java.util.HashMap<>();
-        for (Long movieId : movieIds) {
-            result.put(movieId, userMovieListService.getMovieStatus(userId, movieId, contentType));
-        }
+        Map<Long, List<Map<String, Object>>> result = userMovieListService.getMovieStatusBatch(userId, movieIds, contentType);
         return Result.ok(result);
     }
 }

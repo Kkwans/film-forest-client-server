@@ -40,7 +40,7 @@ src/main/java/com/filmforest/
 | POST | /api/movies | 新增电影 |
 | GET | /api/movies/{id} | 电影详情 |
 
-详见 [任务文档](../tasks/2026-04/film-forest-0425/PLAN.md)
+详见 [任务文档](../tasks/2026-04/0425_10-影视森林开发/PLAN.md)
 
 ## 本地运行
 

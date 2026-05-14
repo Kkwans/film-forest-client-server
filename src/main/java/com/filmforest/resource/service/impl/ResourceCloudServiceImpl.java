@@ -25,14 +25,4 @@ public class ResourceCloudServiceImpl extends ServiceImpl<ResourceCloudMapper, R
                 .orderByAsc(ResourceCloud::getSort)
                 .list();
     }
-
-    @Override
-    public List<ResourceCloud> listByContentAndEpisode(String contentType, Long contentId, Long episodeId) {
-        return lambdaQuery()
-                .eq(ResourceCloud::getContentType, contentType)
-                .eq(ResourceCloud::getContentId, contentId)
-                .eq(episodeId != null, ResourceCloud::getEpisodeId, episodeId)
-                .orderByAsc(ResourceCloud::getSort)
-                .list();
-    }
 }

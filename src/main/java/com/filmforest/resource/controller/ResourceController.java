@@ -34,16 +34,18 @@ public class ResourceController {
      * 获取在线播放资源列表
      * @param contentType movie/drama/variety/anime/short
      * @param contentId 内容ID
-     * @param episodeId 集数ID（可选）
+     * @param season 季（可选，默认1）
+     * @param episodeNumber 集号（可选）
      */
     @GetMapping("/online")
     public Result<List<ResourceOnline>> listOnline(
             @RequestParam String contentType,
             @RequestParam Long contentId,
-            @RequestParam(required = false) Long episodeId) {
+            @RequestParam(required = false) Integer season,
+            @RequestParam(required = false) Integer episodeNumber) {
         List<ResourceOnline> list;
-        if (episodeId != null) {
-            list = resourceOnlineService.listByContentAndEpisode(contentType, contentId, episodeId);
+        if (season != null || episodeNumber != null) {
+            list = resourceOnlineService.listByContentAndEpisode(contentType, contentId, season, episodeNumber);
         } else {
             list = resourceOnlineService.listByContent(contentType, contentId);
         }
@@ -58,15 +60,8 @@ public class ResourceController {
     @GetMapping("/magnet")
     public Result<List<ResourceMagnet>> listMagnet(
             @RequestParam String contentType,
-            @RequestParam Long contentId,
-            @RequestParam(required = false) Long episodeId) {
-        List<ResourceMagnet> list;
-        if (episodeId != null) {
-            list = resourceMagnetService.listByContentAndEpisode(contentType, contentId, episodeId);
-        } else {
-            list = resourceMagnetService.listByContent(contentType, contentId);
-        }
-        return Result.ok(list);
+            @RequestParam Long contentId) {
+        return Result.ok(resourceMagnetService.listByContent(contentType, contentId));
     }
 
     // ==================== 网盘资源 ====================
@@ -77,14 +72,7 @@ public class ResourceController {
     @GetMapping("/cloud")
     public Result<List<ResourceCloud>> listCloud(
             @RequestParam String contentType,
-            @RequestParam Long contentId,
-            @RequestParam(required = false) Long episodeId) {
-        List<ResourceCloud> list;
-        if (episodeId != null) {
-            list = resourceCloudService.listByContentAndEpisode(contentType, contentId, episodeId);
-        } else {
-            list = resourceCloudService.listByContent(contentType, contentId);
-        }
-        return Result.ok(list);
+            @RequestParam Long contentId) {
+        return Result.ok(resourceCloudService.listByContent(contentType, contentId));
     }
 }

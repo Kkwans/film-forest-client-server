@@ -8,8 +8,7 @@ import com.filmforest.content.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -184,49 +183,61 @@ public class SearchController {
             )));
         } catch (Exception e) { }
         
-        // 根据 sort 参数排序
+        // 根据 sort 参数排序（使用堆排序，只维护 top-N）
         boolean desc = "desc".equalsIgnoreCase(sortDir);
-        allResults.sort((a, b) -> {
-            int cmp = 0;
-            switch (sort) {
-                case "year":
-                    int ya = a.year != null ? a.year : 0;
-                    int yb = b.year != null ? b.year : 0;
-                    cmp = Integer.compare(ya, yb);
-                    break;
-                case "douban":
-                    double da = a.rating != null ? a.rating : 0;
-                    double db = b.rating != null ? b.rating : 0;
-                    cmp = Double.compare(da, db);
-                    break;
-                case "imdb":
-                    double ia = a.ratingImdb != null ? a.ratingImdb : 0;
-                    double ib = b.ratingImdb != null ? b.ratingImdb : 0;
-                    cmp = Double.compare(ia, ib);
-                    break;
-                case "rt":
-                    double ra = a.ratingRT != null ? a.ratingRT : 0;
-                    double rb = b.ratingRT != null ? b.ratingRT : 0;
-                    cmp = Double.compare(ra, rb);
-                    break;
-                default: // latest - 按评分降序（默认）
-                    double la = a.rating != null ? a.rating : 0;
-                    double lb = b.rating != null ? b.rating : 0;
-                    cmp = Double.compare(la, lb);
-                    break;
+        Comparator<SearchResult> comparator = getSearchResultComparator(sort, desc);
+
+        // 使用 PriorityQueue（最小堆）高效取 top-N，避免全量排序
+        int need = from + size;
+        PriorityQueue<SearchResult> heap = new PriorityQueue<>(need + 1, comparator);
+        for (SearchResult r : allResults) {
+            heap.offer(r);
+            if (heap.size() > need) {
+                heap.poll(); // 丢弃不符合条件的
             }
-            return desc ? -cmp : cmp;
-        });
-        
-        // 简单分页
+        }
+
+        // 堆中取出结果（逆序输出）
+        List<SearchResult> sorted = new ArrayList<>(heap.size());
+        while (!heap.isEmpty()) {
+            sorted.add(heap.poll());
+        }
+        Collections.reverse(sorted);
+
+        // 分页截取
         int total = allResults.size();
-        List<SearchResult> pageData = allResults.stream()
+        List<SearchResult> pageData = sorted.stream()
                 .skip(from)
                 .limit(size)
                 .collect(Collectors.toList());
         
         PageWrap<SearchResult> pageWrap = new PageWrap<>(pageData, total, size);
         return Result.ok(pageWrap);
+    }
+
+    /**
+     * 根据排序字段返回比较器
+     */
+    private Comparator<SearchResult> getSearchResultComparator(String sort, boolean desc) {
+        Comparator<SearchResult> cmp;
+        switch (sort) {
+            case "year":
+                cmp = Comparator.comparingInt(r -> r.year != null ? r.year : 0);
+                break;
+            case "imdb":
+                cmp = Comparator.comparingDouble(r -> r.ratingImdb != null ? r.ratingImdb : 0);
+                break;
+            case "rt":
+                cmp = Comparator.comparingDouble(r -> r.ratingRT != null ? r.ratingRT : 0);
+                break;
+            case "douban":
+                cmp = Comparator.comparingDouble(r -> r.rating != null ? r.rating : 0);
+                break;
+            default: // latest - 默认按豆瓣评分
+                cmp = Comparator.comparingDouble(r -> r.rating != null ? r.rating : 0);
+                break;
+        }
+        return desc ? cmp.reversed() : cmp;
     }
 
     // 内部类：搜索结果

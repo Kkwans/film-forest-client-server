@@ -27,11 +27,12 @@ public class ResourceOnlineServiceImpl extends ServiceImpl<ResourceOnlineMapper,
     }
 
     @Override
-    public List<ResourceOnline> listByContentAndEpisode(String contentType, Long contentId, Long episodeId) {
+    public List<ResourceOnline> listByContentAndEpisode(String contentType, Long contentId, Integer season, Integer episodeNumber) {
         return lambdaQuery()
                 .eq(ResourceOnline::getContentType, contentType)
                 .eq(ResourceOnline::getContentId, contentId)
-                .eq(episodeId != null, ResourceOnline::getEpisodeId, episodeId)
+                .eq(season != null, ResourceOnline::getSeason, season)
+                .eq(episodeNumber != null, ResourceOnline::getEpisodeNumber, episodeNumber)
                 .orderByAsc(ResourceOnline::getSort)
                 .list();
     }

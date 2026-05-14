@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -231,7 +232,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, wrapper);
             Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
             voPage.setTotal(itemPage.getTotal());
-            voPage.setRecords(itemPage.getRecords().stream().map(this::enrichItem).collect(Collectors.toList()));
+            voPage.setRecords(enrichItems(itemPage.getRecords()));
             return voPage;
         }
 
@@ -240,7 +241,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId));
 
-        List<UserListItemVO> voList = itemPage.getRecords().stream().map(this::enrichItem).collect(Collectors.toList());
+        List<UserListItemVO> voList = enrichItems(itemPage.getRecords());
 
         // 在 VO 层排序
         voList.sort((a, b) -> {
@@ -269,9 +270,70 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     }
 
     /**
-     * 为片单条目填充影视基本信息
+     * 批量为片单条目填充影视基本信息（解决 N+1 查询问题）
+     * 按 contentType 分组，每组只发一次批量查询
      */
-    private UserListItemVO enrichItem(UserMovieListItem item) {
+    private List<UserListItemVO> enrichItems(List<UserMovieListItem> items) {
+        if (items.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 按 contentType 分组收集需要查询的 ID
+        Map<String, List<Long>> idsByType = new HashMap<>();
+        for (UserMovieListItem item : items) {
+            idsByType.computeIfAbsent(item.getContentType(), k -> new ArrayList<>()).add(item.getMovieId());
+        }
+
+        // 批量查询每种类型的内容（每种类型最多 1 次 IN 查询，替代 N 次 selectById）
+        Map<Long, Movie> movieMap = Collections.emptyMap();
+        Map<Long, Drama> dramaMap = Collections.emptyMap();
+        Map<Long, Variety> varietyMap = Collections.emptyMap();
+        Map<Long, Anime> animeMap = Collections.emptyMap();
+        Map<Long, ShortDrama> shortDramaMap = Collections.emptyMap();
+
+        if (idsByType.containsKey("movie")) {
+            List<Long> ids = idsByType.get("movie");
+            movieMap = movieMapper.selectBatchIds(ids).stream()
+                    .collect(Collectors.toMap(Movie::getId, Function.identity(), (a, b) -> a));
+        }
+        if (idsByType.containsKey("drama")) {
+            List<Long> ids = idsByType.get("drama");
+            dramaMap = dramaMapper.selectBatchIds(ids).stream()
+                    .collect(Collectors.toMap(Drama::getId, Function.identity(), (a, b) -> a));
+        }
+        if (idsByType.containsKey("variety")) {
+            List<Long> ids = idsByType.get("variety");
+            varietyMap = varietyMapper.selectBatchIds(ids).stream()
+                    .collect(Collectors.toMap(Variety::getId, Function.identity(), (a, b) -> a));
+        }
+        if (idsByType.containsKey("anime")) {
+            List<Long> ids = idsByType.get("anime");
+            animeMap = animeMapper.selectBatchIds(ids).stream()
+                    .collect(Collectors.toMap(Anime::getId, Function.identity(), (a, b) -> a));
+        }
+        if (idsByType.containsKey("short_drama")) {
+            List<Long> ids = idsByType.get("short_drama");
+            shortDramaMap = shortDramaMapper.selectBatchIds(ids).stream()
+                    .collect(Collectors.toMap(ShortDrama::getId, Function.identity(), (a, b) -> a));
+        }
+
+        // 组装 VO
+        List<UserListItemVO> result = new ArrayList<>(items.size());
+        for (UserMovieListItem item : items) {
+            result.add(enrichItem(item, movieMap, dramaMap, varietyMap, animeMap, shortDramaMap));
+        }
+        return result;
+    }
+
+    /**
+     * 为单个片单条目填充影视基本信息（从预加载的 Map 中获取，无额外查询）
+     */
+    private UserListItemVO enrichItem(UserMovieListItem item,
+                                       Map<Long, Movie> movieMap,
+                                       Map<Long, Drama> dramaMap,
+                                       Map<Long, Variety> varietyMap,
+                                       Map<Long, Anime> animeMap,
+                                       Map<Long, ShortDrama> shortDramaMap) {
         UserListItemVO vo = new UserListItemVO();
         vo.setId(item.getId());
         vo.setListId(item.getListId());
@@ -281,12 +343,11 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         vo.setUserRating(item.getRating());
         vo.setNote(item.getNote());
 
-        // 根据 contentType 查询对应的表
         String ct = item.getContentType();
         Long movieId = item.getMovieId();
 
         if ("movie".equals(ct)) {
-            Movie m = movieMapper.selectById(movieId);
+            Movie m = movieMap.get(movieId);
             if (m != null) {
                 vo.setTitle(m.getTitle());
                 vo.setCover(m.getPosterUrl());
@@ -299,7 +360,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setDuration(m.getDuration());
             }
         } else if ("drama".equals(ct)) {
-            Drama d = dramaMapper.selectById(movieId);
+            Drama d = dramaMap.get(movieId);
             if (d != null) {
                 vo.setTitle(d.getTitle());
                 vo.setCover(d.getPosterUrl());
@@ -312,7 +373,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setTotalEpisode(d.getTotalEpisode());
             }
         } else if ("variety".equals(ct)) {
-            Variety v = varietyMapper.selectById(movieId);
+            Variety v = varietyMap.get(movieId);
             if (v != null) {
                 vo.setTitle(v.getTitle());
                 vo.setCover(v.getPosterUrl());
@@ -325,7 +386,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setTotalEpisode(v.getTotalEpisode());
             }
         } else if ("anime".equals(ct)) {
-            Anime a = animeMapper.selectById(movieId);
+            Anime a = animeMap.get(movieId);
             if (a != null) {
                 vo.setTitle(a.getTitle());
                 vo.setCover(a.getPosterUrl());
@@ -338,7 +399,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setTotalEpisode(a.getTotalEpisode());
             }
         } else if ("short_drama".equals(ct)) {
-            ShortDrama s = shortDramaMapper.selectById(movieId);
+            ShortDrama s = shortDramaMap.get(movieId);
             if (s != null) {
                 vo.setTitle(s.getTitle());
                 vo.setCover(s.getPosterUrl());
@@ -375,8 +436,17 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
     @Override
     public List<Map<String, Object>> getMovieStatus(Long userId, Long movieId, String contentType) {
-        // 获取用户所有片单
-        List<UserMovieList> lists = getUserLists(userId);
+        return getMovieStatusInternal(userId, movieId, contentType, null);
+    }
+
+    /**
+     * 内部方法：查询单个影视在用户片单中的状态
+     * @param cachedLists 可选的缓存片单列表，避免重复查询
+     */
+    private List<Map<String, Object>> getMovieStatusInternal(Long userId, Long movieId, String contentType,
+                                                              List<UserMovieList> cachedLists) {
+        // 获取用户所有片单（优先使用缓存）
+        List<UserMovieList> lists = cachedLists != null ? cachedLists : getUserLists(userId);
         if (lists.isEmpty()) {
             return Collections.emptyList();
         }
@@ -393,13 +463,35 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 .map(UserMovieListItem::getListId)
                 .collect(Collectors.toSet());
 
+        Map<Long, UserMovieListItem> itemMap = items.stream()
+                .collect(Collectors.toMap(UserMovieListItem::getListId, i -> i, (a, b) -> a));
+
         return lists.stream().map(list -> {
             Map<String, Object> map = new HashMap<>();
             map.put("listId", list.getId());
             map.put("listName", list.getName());
             map.put("type", list.getType());
-            map.put("added", matchedListIds.contains(list.getId()));
+            boolean added = matchedListIds.contains(list.getId());
+            map.put("added", added);
+            if (added) {
+                UserMovieListItem item = itemMap.get(list.getId());
+                if (item != null) {
+                    map.put("userRating", item.getRating());
+                    map.put("note", item.getNote());
+                }
+            }
             return map;
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    public Map<Long, List<Map<String, Object>>> getMovieStatusBatch(Long userId, List<Long> movieIds, String contentType) {
+        // 只查一次用户片单，共享给所有 movieId
+        List<UserMovieList> lists = getUserLists(userId);
+        Map<Long, List<Map<String, Object>>> result = new HashMap<>();
+        for (Long movieId : movieIds) {
+            result.put(movieId, getMovieStatusInternal(userId, movieId, contentType, lists));
+        }
+        return result;
     }
 }

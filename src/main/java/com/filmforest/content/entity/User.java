@@ -22,6 +22,10 @@ public class User {
     private String avatarUrl;       // 头像URL
     private Integer status;         // 状态：0=禁用 1=正常
 
+    @TableLogic
+    @TableField("is_deleted")
+    private Integer deleted;          // 逻辑删除
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

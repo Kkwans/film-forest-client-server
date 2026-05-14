@@ -25,14 +25,4 @@ public class ResourceMagnetServiceImpl extends ServiceImpl<ResourceMagnetMapper,
                 .orderByAsc(ResourceMagnet::getSort)
                 .list();
     }
-
-    @Override
-    public List<ResourceMagnet> listByContentAndEpisode(String contentType, Long contentId, Long episodeId) {
-        return lambdaQuery()
-                .eq(ResourceMagnet::getContentType, contentType)
-                .eq(ResourceMagnet::getContentId, contentId)
-                .eq(episodeId != null, ResourceMagnet::getEpisodeId, episodeId)
-                .orderByAsc(ResourceMagnet::getSort)
-                .list();
-    }
 }
