@@ -485,6 +485,31 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void batchRemoveItems(Long userId, Long listId, List<Map<String, Object>> items) {
+        // 校验片单归属
+        UserMovieList list = getById(listId);
+        if (list == null || !list.getUserId().equals(userId)) {
+            throw new RuntimeException("片单不存在");
+        }
+
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+
+        for (Map<String, Object> item : items) {
+            Long movieId = item.get("movieId") != null ? Long.valueOf(item.get("movieId").toString()) : null;
+            String contentType = (String) item.get("contentType");
+            if (movieId != null && contentType != null && !contentType.isBlank()) {
+                itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
+                        .eq(UserMovieListItem::getListId, listId)
+                        .eq(UserMovieListItem::getMovieId, movieId)
+                        .eq(UserMovieListItem::getContentType, contentType));
+            }
+        }
+    }
+
+    @Override
     public Map<Long, List<Map<String, Object>>> getMovieStatusBatch(Long userId, List<Long> movieIds, String contentType) {
         // 只查一次用户片单，共享给所有 movieId
         List<UserMovieList> lists = getUserLists(userId);

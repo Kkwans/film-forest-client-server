@@ -184,6 +184,28 @@ public class UserMovieListController {
     }
 
     /**
+     * 批量从片单移除影视
+     */
+    @DeleteMapping("/lists/{id}/items/batch")
+    public Result<?> batchRemoveItems(HttpServletRequest request, @PathVariable Long id,
+                                      @RequestBody Map<String, Object> params) {
+        Long userId = (Long) request.getAttribute("userId");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) params.get("items");
+
+        if (items == null || items.isEmpty()) {
+            return Result.fail(400, "items 不能为空");
+        }
+
+        try {
+            userMovieListService.batchRemoveItems(userId, id, items);
+            return Result.ok();
+        } catch (RuntimeException e) {
+            return Result.fail(400, e.getMessage());
+        }
+    }
+
+    /**
      * 查询影视在哪些片单中
      */
     @GetMapping("/movie-status")

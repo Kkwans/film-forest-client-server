@@ -65,4 +65,9 @@ public interface UserMovieListService extends IService<UserMovieList> {
      * 批量查询影视在哪些片单中（共享片单查询，避免重复查库）
      */
     Map<Long, List<Map<String, Object>>> getMovieStatusBatch(Long userId, List<Long> movieIds, String contentType);
+
+    /**
+     * 批量从片单移除影视
+     */
+    void batchRemoveItems(Long userId, Long listId, List<Map<String, Object>> items);
 }
