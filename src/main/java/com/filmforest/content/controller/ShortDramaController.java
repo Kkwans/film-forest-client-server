@@ -3,6 +3,7 @@ package com.filmforest.content.controller;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.ShortDrama;
 import com.filmforest.content.service.ShortDramaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,13 +39,13 @@ public class ShortDramaController {
     }
 
     @PostMapping
-    public Result<?> add(@RequestBody ShortDrama shortDrama) {
+    public Result<?> add(@Valid @RequestBody ShortDrama shortDrama) {
         shortDramaService.save(shortDrama);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
-    public Result<?> update(@PathVariable Long id, @RequestBody ShortDrama shortDrama) {
+    public Result<?> update(@PathVariable Long id, @Valid @RequestBody ShortDrama shortDrama) {
         shortDrama.setId(id);
         shortDramaService.updateById(shortDrama);
         return Result.ok();

@@ -1,10 +1,15 @@
 package com.filmforest.content.controller;
 
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.dto.LoginRequest;
+import com.filmforest.content.dto.RegisterRequest;
 import com.filmforest.content.entity.User;
 import com.filmforest.content.service.UserService;
 import com.filmforest.content.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +23,8 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
     @Autowired
     private UserService userService;
 
@@ -28,27 +35,19 @@ public class AuthController {
      * 用户注册
      */
     @PostMapping("/register")
-    public Result<?> register(@RequestBody Map<String, String> params) {
-        String username = params.get("username");
-        String password = params.get("password");
-        String email = params.get("email");
-
-        if (username == null || username.isBlank()) {
-            return Result.fail(400, "用户名不能为空");
-        }
-        if (password == null || password.length() < 6) {
-            return Result.fail(400, "密码长度不能少于6位");
-        }
-
+    public Result<?> register(@Valid @RequestBody RegisterRequest request) {
+        log.info("注册请求: username={}", request.getUsername());
         try {
-            User user = userService.register(username, password, email);
+            User user = userService.register(request.getUsername(), request.getPassword(), request.getEmail());
             String token = jwtUtil.generateToken(user.getId(), user.getUsername());
 
             Map<String, Object> data = new HashMap<>();
             data.put("token", token);
             data.put("user", sanitizeUser(user));
+            log.info("注册成功: userId={}", user.getId());
             return Result.ok(data);
         } catch (RuntimeException e) {
+            log.warn("注册失败: username={}, reason={}", request.getUsername(), e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -57,26 +56,19 @@ public class AuthController {
      * 用户登录
      */
     @PostMapping("/login")
-    public Result<?> login(@RequestBody Map<String, String> params) {
-        String username = params.get("username");
-        String password = params.get("password");
-
-        if (username == null || username.isBlank()) {
-            return Result.fail(400, "用户名不能为空");
-        }
-        if (password == null || password.isBlank()) {
-            return Result.fail(400, "密码不能为空");
-        }
-
+    public Result<?> login(@Valid @RequestBody LoginRequest request) {
+        log.info("登录请求: username={}", request.getUsername());
         try {
-            User user = userService.login(username, password);
+            User user = userService.login(request.getUsername(), request.getPassword());
             String token = jwtUtil.generateToken(user.getId(), user.getUsername());
 
             Map<String, Object> data = new HashMap<>();
             data.put("token", token);
             data.put("user", sanitizeUser(user));
+            log.info("登录成功: userId={}", user.getId());
             return Result.ok(data);
         } catch (RuntimeException e) {
+            log.warn("登录失败: username={}, reason={}", request.getUsername(), e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -93,6 +85,7 @@ public class AuthController {
 
         User user = userService.getById(userId);
         if (user == null) {
+            log.warn("用户不存在: userId={}", userId);
             return Result.fail(404, "用户不存在");
         }
 

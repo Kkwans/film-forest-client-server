@@ -3,6 +3,7 @@ package com.filmforest.content.controller;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Drama;
 import com.filmforest.content.service.DramaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,13 +39,13 @@ public class DramaController {
     }
 
     @PostMapping
-    public Result<?> add(@RequestBody Drama drama) {
+    public Result<?> add(@Valid @RequestBody Drama drama) {
         dramaService.save(drama);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
-    public Result<?> update(@PathVariable Long id, @RequestBody Drama drama) {
+    public Result<?> update(@PathVariable Long id, @Valid @RequestBody Drama drama) {
         drama.setId(id);
         dramaService.updateById(drama);
         return Result.ok();

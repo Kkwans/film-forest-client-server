@@ -3,6 +3,7 @@ package com.filmforest.content.controller;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Anime;
 import com.filmforest.content.service.AnimeService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,13 +39,13 @@ public class AnimeController {
     }
 
     @PostMapping
-    public Result<?> add(@RequestBody Anime anime) {
+    public Result<?> add(@Valid @RequestBody Anime anime) {
         animeService.save(anime);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
-    public Result<?> update(@PathVariable Long id, @RequestBody Anime anime) {
+    public Result<?> update(@PathVariable Long id, @Valid @RequestBody Anime anime) {
         anime.setId(id);
         animeService.updateById(anime);
         return Result.ok();

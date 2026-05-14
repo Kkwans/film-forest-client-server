@@ -3,6 +3,7 @@ package com.filmforest.content.controller;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Movie;
 import com.filmforest.content.service.MovieService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -43,7 +44,7 @@ public class MovieController {
      * 新增电影（管理端）
      */
     @PostMapping
-    public Result<?> add(@RequestBody Movie movie) {
+    public Result<?> add(@Valid @RequestBody Movie movie) {
         movieService.save(movie);
         return Result.ok();
     }
@@ -52,7 +53,7 @@ public class MovieController {
      * 更新电影（管理端）
      */
     @PutMapping("/{id}")
-    public Result<?> update(@PathVariable Long id, @RequestBody Movie movie) {
+    public Result<?> update(@PathVariable Long id, @Valid @RequestBody Movie movie) {
         movie.setId(id);
         movieService.updateById(movie);
         return Result.ok();

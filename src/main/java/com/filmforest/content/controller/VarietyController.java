@@ -3,6 +3,7 @@ package com.filmforest.content.controller;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Variety;
 import com.filmforest.content.service.VarietyService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,13 +39,13 @@ public class VarietyController {
     }
 
     @PostMapping
-    public Result<?> add(@RequestBody Variety variety) {
+    public Result<?> add(@Valid @RequestBody Variety variety) {
         varietyService.save(variety);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
-    public Result<?> update(@PathVariable Long id, @RequestBody Variety variety) {
+    public Result<?> update(@PathVariable Long id, @Valid @RequestBody Variety variety) {
         variety.setId(id);
         varietyService.updateById(variety);
         return Result.ok();
