@@ -8,6 +8,10 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 健康检查控制器
+ * 提供 /health 端点，用于 Docker 容器健康检测和负载均衡探针
+ */
 @RestController
 public class HealthController {
 

@@ -41,5 +41,5 @@ jwt:
 
 logging:
   level:
-    com.filmforest: debug
-    com.filmforest.mapper: debug
+    com.filmforest: info
+    com.filmforest.mapper: warn

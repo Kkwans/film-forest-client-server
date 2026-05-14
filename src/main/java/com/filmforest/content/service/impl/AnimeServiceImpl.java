@@ -11,6 +11,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
+/**
+ * 动漫服务实现
+ */
 public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements AnimeService {
 
     @Override

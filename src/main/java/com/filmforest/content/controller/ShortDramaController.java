@@ -6,6 +6,10 @@ import com.filmforest.content.service.ShortDramaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 短剧 API 控制器
+ * 提供短剧列表查询和详情获取接口
+ */
 @RestController
 @RequestMapping("/api/short-dramas")
 public class ShortDramaController {

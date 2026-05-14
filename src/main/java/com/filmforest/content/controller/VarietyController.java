@@ -6,6 +6,10 @@ import com.filmforest.content.service.VarietyService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * 综艺 API 控制器
+ * 提供综艺列表查询和详情获取接口
+ */
 @RestController
 @RequestMapping("/api/varieties")
 public class VarietyController {

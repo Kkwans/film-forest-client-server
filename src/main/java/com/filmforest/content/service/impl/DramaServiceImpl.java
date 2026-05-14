@@ -11,6 +11,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
 @Service
+/**
+ * 电视剧服务实现
+ */
 public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements DramaService {
 
     @Override
