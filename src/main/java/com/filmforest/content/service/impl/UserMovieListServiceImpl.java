@@ -10,6 +10,7 @@ import com.filmforest.content.entity.*;
 import com.filmforest.content.mapper.*;
 import com.filmforest.content.service.UserMovieListService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -128,11 +129,12 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             throw new RuntimeException("默认片单不可删除");
         }
 
-        // 删除片单下的所有条目
+        // 先删除片单记录，再删除条目 —— 减少与 addItem 的竞态窗口
+        // 并发的 addItem 在 getById 时会因片单已删除而直接失败
+        removeById(listId);
+        // 再删除片单下的所有条目（孤儿数据清理）
         itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId));
-        // 删除片单
-        removeById(listId);
     }
 
     @Override
@@ -144,26 +146,29 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             throw new RuntimeException("片单不存在");
         }
 
-        // 检查是否已存在
-        UserMovieListItem existing = itemMapper.selectOne(new LambdaQueryWrapper<UserMovieListItem>()
-                .eq(UserMovieListItem::getListId, listId)
-                .eq(UserMovieListItem::getMovieId, movieId)
-                .eq(UserMovieListItem::getContentType, contentType));
-        if (existing != null) {
-            // 已存在则更新评分和备注
-            if (rating != null) existing.setRating(rating);
-            if (note != null) existing.setNote(note);
-            itemMapper.updateById(existing);
-            return;
-        }
-
+        // 先尝试直接插入，利用 UNIQUE 约束 (list_id, movie_id, content_type) 防止并发重复
         UserMovieListItem item = new UserMovieListItem();
         item.setListId(listId);
         item.setMovieId(movieId);
         item.setContentType(contentType);
         item.setRating(rating);
         item.setNote(note);
-        itemMapper.insert(item);
+
+        try {
+            itemMapper.insert(item);
+        } catch (DuplicateKeyException e) {
+            // 唯一约束冲突 = 已存在，转为更新评分和备注
+            UserMovieListItem existing = itemMapper.selectOne(new LambdaQueryWrapper<UserMovieListItem>()
+                    .eq(UserMovieListItem::getListId, listId)
+                    .eq(UserMovieListItem::getMovieId, movieId)
+                    .eq(UserMovieListItem::getContentType, contentType));
+            if (existing != null) {
+                if (rating != null) existing.setRating(rating);
+                if (note != null) existing.setNote(note);
+                itemMapper.updateById(existing);
+            }
+            return;
+        }
 
         // 互斥逻辑：
         // 1. 添加到在看/看过 → 自动从想看删除
