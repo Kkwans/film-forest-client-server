@@ -6,6 +6,7 @@ import com.filmforest.content.dto.UserListItemVO;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.service.UserMovieListService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.Map;
 /**
  * 用户片单控制器
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/user")
 public class UserMovieListController {
@@ -43,13 +45,16 @@ public class UserMovieListController {
         String description = params.get("description");
 
         if (name == null || name.isBlank()) {
+            log.warn("[UserList] 创建片单失败: 名称为空, userId={}", userId);
             return Result.fail(400, "片单名称不能为空");
         }
 
         try {
             UserMovieList list = userMovieListService.createList(userId, name, description);
+            log.info("[UserList] 创建片单成功: userId={}, listId={}, name={}", userId, list.getId(), name);
             return Result.ok(list);
         } catch (RuntimeException e) {
+            log.warn("[UserList] 创建片单失败: userId={}, reason={}", userId, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -66,8 +71,10 @@ public class UserMovieListController {
 
         try {
             userMovieListService.updateList(userId, id, name, description);
+            log.info("[UserList] 更新片单: userId={}, listId={}", userId, id);
             return Result.ok();
         } catch (RuntimeException e) {
+            log.warn("[UserList] 更新片单失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -80,8 +87,10 @@ public class UserMovieListController {
         Long userId = (Long) request.getAttribute("userId");
         try {
             userMovieListService.deleteList(userId, id);
+            log.info("[UserList] 删除片单: userId={}, listId={}", userId, id);
             return Result.ok();
         } catch (RuntimeException e) {
+            log.warn("[UserList] 删除片单失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -97,6 +106,7 @@ public class UserMovieListController {
         String contentType = (String) params.get("contentType");
 
         if (movieId == null || contentType == null || contentType.isBlank()) {
+            log.warn("[UserList] 添加影视失败: 参数不完整, userId={}, listId={}", userId, id);
             return Result.fail(400, "movieId 和 contentType 不能为空");
         }
 
@@ -109,8 +119,10 @@ public class UserMovieListController {
 
         try {
             userMovieListService.addItem(userId, id, movieId, contentType, rating, note);
+            log.info("[UserList] 添加影视到片单: userId={}, listId={}, movieId={}, contentType={}", userId, id, movieId, contentType);
             return Result.ok();
         } catch (RuntimeException e) {
+            log.warn("[UserList] 添加影视失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -126,13 +138,16 @@ public class UserMovieListController {
         String contentType = (String) params.get("contentType");
 
         if (movieId == null || contentType == null || contentType.isBlank()) {
+            log.warn("[UserList] 移除影视失败: 参数不完整, userId={}, listId={}", userId, id);
             return Result.fail(400, "movieId 和 contentType 不能为空");
         }
 
         try {
             userMovieListService.removeItem(userId, id, movieId, contentType);
+            log.info("[UserList] 从片单移除影视: userId={}, listId={}, movieId={}, contentType={}", userId, id, movieId, contentType);
             return Result.ok();
         } catch (RuntimeException e) {
+            log.warn("[UserList] 移除影视失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -149,8 +164,10 @@ public class UserMovieListController {
         Long userId = (Long) request.getAttribute("userId");
         try {
             IPage<UserListItemVO> items = userMovieListService.getListItems(userId, id, page, size, sort, sortDir);
+            log.debug("[UserList] 获取片单内容: userId={}, listId={}, page={}, size={}", userId, id, page, size);
             return Result.ok(items);
         } catch (RuntimeException e) {
+            log.warn("[UserList] 获取片单内容失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -166,6 +183,7 @@ public class UserMovieListController {
         String contentType = (String) params.get("contentType");
 
         if (movieId == null || contentType == null || contentType.isBlank()) {
+            log.warn("[UserList] 更新条目失败: 参数不完整, userId={}, listId={}", userId, id);
             return Result.fail(400, "movieId 和 contentType 不能为空");
         }
 
@@ -177,8 +195,10 @@ public class UserMovieListController {
 
         try {
             userMovieListService.updateItem(userId, id, movieId, contentType, rating, note);
+            log.info("[UserList] 更新片单条目: userId={}, listId={}, movieId={}, contentType={}", userId, id, movieId, contentType);
             return Result.ok();
         } catch (RuntimeException e) {
+            log.warn("[UserList] 更新条目失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -194,13 +214,16 @@ public class UserMovieListController {
         List<Map<String, Object>> items = (List<Map<String, Object>>) params.get("items");
 
         if (items == null || items.isEmpty()) {
+            log.warn("[UserList] 批量移除失败: items 为空, userId={}, listId={}", userId, id);
             return Result.fail(400, "items 不能为空");
         }
 
         try {
             userMovieListService.batchRemoveItems(userId, id, items);
+            log.info("[UserList] 批量移除影视: userId={}, listId={}, count={}", userId, id, items.size());
             return Result.ok();
         } catch (RuntimeException e) {
+            log.warn("[UserList] 批量移除失败: userId={}, listId={}, reason={}", userId, id, e.getMessage());
             return Result.fail(400, e.getMessage());
         }
     }
@@ -214,6 +237,7 @@ public class UserMovieListController {
                                     @RequestParam String contentType) {
         Long userId = (Long) request.getAttribute("userId");
         List<Map<String, Object>> status = userMovieListService.getMovieStatus(userId, movieId, contentType);
+        log.debug("[UserList] 查询影视状态: userId={}, movieId={}, contentType={}, resultCount={}", userId, movieId, contentType, status.size());
         return Result.ok(status);
     }
 
@@ -226,6 +250,7 @@ public class UserMovieListController {
                                          @RequestParam String contentType) {
         Long userId = (Long) request.getAttribute("userId");
         Map<Long, List<Map<String, Object>>> result = userMovieListService.getMovieStatusBatch(userId, movieIds, contentType);
+        log.debug("[UserList] 批量查询影视状态: userId={}, movieIds={}, contentType={}, resultCount={}", userId, movieIds.size(), contentType, result.size());
         return Result.ok(result);
     }
 }

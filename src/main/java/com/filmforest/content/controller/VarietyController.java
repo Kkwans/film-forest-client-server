@@ -4,13 +4,11 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Variety;
 import com.filmforest.content.service.VarietyService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 综艺 API 控制器
- * 提供综艺列表查询和详情获取接口
- */
+@Slf4j
 @RestController
 @RequestMapping("/api/varieties")
 public class VarietyController {
@@ -40,12 +38,14 @@ public class VarietyController {
 
     @PostMapping
     public Result<?> add(@Valid @RequestBody Variety variety) {
+        log.info("[Variety] 创建综艺: id={}, title={}", variety.getId(), variety.getTitle());
         varietyService.save(variety);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
     public Result<?> update(@PathVariable Long id, @Valid @RequestBody Variety variety) {
+        log.info("[Variety] 更新综艺: id={}, title={}", id, variety.getTitle());
         variety.setId(id);
         varietyService.updateById(variety);
         return Result.ok();
@@ -53,6 +53,7 @@ public class VarietyController {
 
     @DeleteMapping("/{id}")
     public Result<?> delete(@PathVariable Long id) {
+        log.info("[Variety] 删除综艺: id={}", id);
         varietyService.removeById(id);
         return Result.ok();
     }

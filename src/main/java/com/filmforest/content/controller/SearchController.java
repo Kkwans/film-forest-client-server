@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.*;
 import com.filmforest.content.service.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 /**
  * 全局搜索接口
  * 支持电影/剧集/综艺/动漫/短剧的跨类型搜索，统一排序和分页
@@ -38,10 +40,12 @@ public class SearchController {
             @RequestParam(defaultValue = "desc") String sortDir) {
 
         if (keyword == null || keyword.trim().isEmpty()) {
+            log.warn("[Search] 关键词为空");
             return Result.fail("关键词不能为空");
         }
 
         String kw = keyword.trim();
+        log.debug("[Search] keyword={}, page={}, size={}, sort={}, sortDir={}", kw, page, size, sort, sortDir);
         int from = (page - 1) * size;
         int perTableLimit = Math.max(size, 50);
 

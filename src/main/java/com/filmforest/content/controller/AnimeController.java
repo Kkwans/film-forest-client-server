@@ -4,6 +4,7 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.Anime;
 import com.filmforest.content.service.AnimeService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
  * 动漫 API 控制器
  * 提供动漫列表查询和详情获取接口
  */
+@Slf4j
 @RestController
 @RequestMapping("/api/animes")
 public class AnimeController {
@@ -40,12 +42,14 @@ public class AnimeController {
 
     @PostMapping
     public Result<?> add(@Valid @RequestBody Anime anime) {
+        log.info("[Anime] 创建动漫: id={}, title={}", anime.getId(), anime.getTitle());
         animeService.save(anime);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
     public Result<?> update(@PathVariable Long id, @Valid @RequestBody Anime anime) {
+        log.info("[Anime] 更新动漫: id={}, title={}", id, anime.getTitle());
         anime.setId(id);
         animeService.updateById(anime);
         return Result.ok();
@@ -53,6 +57,7 @@ public class AnimeController {
 
     @DeleteMapping("/{id}")
     public Result<?> delete(@PathVariable Long id) {
+        log.info("[Anime] 删除动漫: id={}", id);
         animeService.removeById(id);
         return Result.ok();
     }

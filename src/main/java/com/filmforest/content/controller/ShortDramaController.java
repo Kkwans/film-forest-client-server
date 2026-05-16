@@ -4,13 +4,11 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.content.entity.ShortDrama;
 import com.filmforest.content.service.ShortDramaService;
 import jakarta.validation.Valid;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-/**
- * 短剧 API 控制器
- * 提供短剧列表查询和详情获取接口
- */
+@Slf4j
 @RestController
 @RequestMapping("/api/short-dramas")
 public class ShortDramaController {
@@ -40,12 +38,14 @@ public class ShortDramaController {
 
     @PostMapping
     public Result<?> add(@Valid @RequestBody ShortDrama shortDrama) {
+        log.info("[ShortDrama] 创建短剧: id={}, title={}", shortDrama.getId(), shortDrama.getTitle());
         shortDramaService.save(shortDrama);
         return Result.ok();
     }
 
     @PutMapping("/{id}")
     public Result<?> update(@PathVariable Long id, @Valid @RequestBody ShortDrama shortDrama) {
+        log.info("[ShortDrama] 更新短剧: id={}, title={}", id, shortDrama.getTitle());
         shortDrama.setId(id);
         shortDramaService.updateById(shortDrama);
         return Result.ok();
@@ -53,6 +53,7 @@ public class ShortDramaController {
 
     @DeleteMapping("/{id}")
     public Result<?> delete(@PathVariable Long id) {
+        log.info("[ShortDrama] 删除短剧: id={}", id);
         shortDramaService.removeById(id);
         return Result.ok();
     }
