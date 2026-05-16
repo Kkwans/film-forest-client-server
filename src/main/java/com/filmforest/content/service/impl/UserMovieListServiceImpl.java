@@ -167,7 +167,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 if (note != null) existing.setNote(note);
                 itemMapper.updateById(existing);
             }
-            return;
+            // 注意：不在此处 return，继续执行互斥逻辑
         }
 
         // 互斥逻辑：
