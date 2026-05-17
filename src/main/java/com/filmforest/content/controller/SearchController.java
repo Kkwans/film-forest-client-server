@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Slf4j
 /**
@@ -26,6 +27,134 @@ public class SearchController {
     @Autowired private VarietyService varietyService;
     @Autowired private AnimeService animeService;
     @Autowired private ShortDramaService shortDramaService;
+
+    /**
+     * 搜索建议：标题前缀匹配，返回 Top 10
+     * 输入框每 300ms 触发一次，快速返回标题建议
+     */
+    @GetMapping("/suggest")
+    public Result<?> suggest(@RequestParam String q) {
+        if (q == null || q.trim().isEmpty()) {
+            return Result.ok(Collections.emptyList());
+        }
+        String kw = q.trim();
+        log.debug("[Search] suggest q={}", kw);
+
+        int perTableLimit = 10;
+        Set<String> seen = new LinkedHashSet<>();
+
+        // 从 5 张表中分别查询标题匹配
+        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, kw, perTableLimit, seen);
+        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, kw, perTableLimit, seen);
+        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, kw, perTableLimit, seen);
+        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, kw, perTableLimit, seen);
+        suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, kw, perTableLimit, seen);
+
+        // 取前 10 个
+        List<String> suggestions = seen.stream().limit(10).collect(Collectors.toList());
+        return Result.ok(suggestions);
+    }
+
+    /**
+     * 热门搜索：返回各类型评分最高的内容标题 Top 10
+     * 用评分最高的内容作为"热门搜索词"（无需额外搜索日志表）
+     */
+    @GetMapping("/hot")
+    public Result<?> hotSearch() {
+        log.debug("[Search] hot search");
+        int perTableLimit = 4;
+        List<Map<String, Object>> hotItems = new ArrayList<>();
+
+        // 从各类型取评分 Top N
+        addHotItems(movieService.list(
+                new LambdaQueryWrapper<Movie>()
+                        .eq(Movie::getStatus, 1)
+                        .orderByDesc(Movie::getScoreDouban)
+                        .last("LIMIT " + perTableLimit)), hotItems, "movie");
+        addHotItems(dramaService.list(
+                new LambdaQueryWrapper<Drama>()
+                        .eq(Drama::getStatus, 1)
+                        .orderByDesc(Drama::getScoreDouban)
+                        .last("LIMIT " + perTableLimit)), hotItems, "drama");
+        addHotItems(animeService.list(
+                new LambdaQueryWrapper<Anime>()
+                        .eq(Anime::getStatus, 1)
+                        .orderByDesc(Anime::getScoreDouban)
+                        .last("LIMIT " + perTableLimit)), hotItems, "anime");
+
+        // 按评分排序取 top 10
+        hotItems.sort((a, b) -> {
+            Double sa = (Double) a.getOrDefault("score", 0.0);
+            Double sb = (Double) b.getOrDefault("score", 0.0);
+            return Double.compare(sb, sa);
+        });
+
+        List<Map<String, Object>> result = hotItems.stream().limit(10).collect(Collectors.toList());
+        return Result.ok(result);
+    }
+
+    // ==================== suggest 辅助方法 ====================
+
+    /** 从单表查询标题前缀匹配 */
+    private <T> void suggestFromTable(
+            com.baomidou.mybatisplus.extension.service.IService<T> service,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> aliasField,
+            String keyword, int limit, Set<String> seen) {
+        try {
+            Page<T> p = service.page(new Page<>(1, limit),
+                    new LambdaQueryWrapper<T>()
+                            .like(titleField, keyword)
+                            .or()
+                            .like(aliasField, keyword));
+            for (T entity : p.getRecords()) {
+                // 通过反射获取 title
+                String title = getTitleFromEntity(entity);
+                if (title != null && !title.isBlank()) {
+                    seen.add(title);
+                }
+            }
+        } catch (Exception e) {
+            log.error("[Search] suggest 查询异常", e);
+        }
+    }
+
+    /** 从实体中提取 title 字段 */
+    private String getTitleFromEntity(Object entity) {
+        try {
+            var method = entity.getClass().getMethod("getTitle");
+            Object val = method.invoke(entity);
+            return val != null ? val.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 添加热门条目 */
+    private void addHotItems(List<?> entities, List<Map<String, Object>> hotItems, String type) {
+        for (Object entity : entities) {
+            try {
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("type", type);
+                if (entity instanceof Movie m) {
+                    item.put("id", m.getId());
+                    item.put("title", m.getTitle());
+                    item.put("score", m.getScoreDouban() != null ? m.getScoreDouban().doubleValue() : 0.0);
+                } else if (entity instanceof Drama d) {
+                    item.put("id", d.getId());
+                    item.put("title", d.getTitle());
+                    item.put("score", d.getScoreDouban() != null ? d.getScoreDouban().doubleValue() : 0.0);
+                } else if (entity instanceof Anime a) {
+                    item.put("id", a.getId());
+                    item.put("title", a.getTitle());
+                    item.put("score", a.getScoreDouban() != null ? a.getScoreDouban().doubleValue() : 0.0);
+                }
+                hotItems.add(item);
+            } catch (Exception e) {
+                log.error("[Search] hot item 处理异常", e);
+            }
+        }
+    }
 
     /**
      * 全局搜索（合并电影/剧集/综艺/动漫/短剧）
