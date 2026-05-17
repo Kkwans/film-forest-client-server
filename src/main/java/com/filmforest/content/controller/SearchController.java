@@ -106,7 +106,8 @@ public class SearchController {
                         m.getStoryline(), m.getDirector(), m.getActor(),
                         m.getGenre(), m.getRegion(), m.getDuration(), null, m.getAlias()));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("[Search] 电影搜索异常: keyword={}", kw, e);
         }
     }
 
@@ -125,7 +126,8 @@ public class SearchController {
                         d.getStoryline(), d.getDirector(), d.getActor(),
                         d.getGenre(), d.getRegion(), null, d.getTotalEpisode(), d.getAlias()));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("[Search] 剧集搜索异常: keyword={}", kw, e);
         }
     }
 
@@ -143,7 +145,8 @@ public class SearchController {
                         v.getStoryline(), v.getDirector(), v.getActor(),
                         v.getGenre(), v.getRegion(), null, v.getTotalEpisode(), v.getAlias()));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("[Search] 综艺搜索异常: keyword={}", kw, e);
         }
     }
 
@@ -162,7 +165,8 @@ public class SearchController {
                         a.getStoryline(), a.getDirector(), a.getActor(),
                         a.getGenre(), a.getRegion(), null, a.getTotalEpisode(), a.getAlias()));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("[Search] 动漫搜索异常: keyword={}", kw, e);
         }
     }
 
@@ -180,7 +184,8 @@ public class SearchController {
                         s.getStoryline(), null, null,
                         s.getGenre(), s.getRegion(), null, s.getTotalEpisode(), s.getAlias()));
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.error("[Search] 短剧搜索异常: keyword={}", kw, e);
         }
     }
 
