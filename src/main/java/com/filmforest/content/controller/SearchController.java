@@ -27,6 +27,7 @@ public class SearchController {
     @Autowired private VarietyService varietyService;
     @Autowired private AnimeService animeService;
     @Autowired private ShortDramaService shortDramaService;
+    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     /**
      * 搜索建议：标题前缀匹配，返回 Top 10
@@ -176,6 +177,7 @@ public class SearchController {
         String kw = keyword.trim();
         log.debug("[Search] keyword={}, page={}, size={}, sort={}, sortDir={}", kw, page, size, sort, sortDir);
         int from = (page - 1) * size;
+
         int perTableLimit = Math.max(size, 50);
 
         List<SearchResult> allResults = new ArrayList<>();
@@ -213,6 +215,15 @@ public class SearchController {
                 .skip(from)
                 .limit(size)
                 .collect(Collectors.toList());
+
+        // 记录搜索日志
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO search_log (keyword, result_count, source, created_at) VALUES (?, ?, 'web', NOW())",
+                kw, total);
+        } catch (Exception e) {
+            log.warn("[Search] 记录搜索日志失败: {}", kw, e);
+        }
 
         return Result.ok(new PageWrap<>(pageData, total, size));
     }
