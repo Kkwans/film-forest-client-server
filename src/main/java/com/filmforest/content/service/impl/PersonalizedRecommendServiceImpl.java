@@ -47,9 +47,11 @@ public class PersonalizedRecommendServiceImpl implements PersonalizedRecommendSe
 
         // 按评分降序
         allResults.sort((a, b) -> {
-            Double sa = (Double) a.getOrDefault("scoreDouban", 0.0);
-            Double sb = (Double) b.getOrDefault("scoreDouban", 0.0);
-            return Double.compare(sb, sa);
+            Double sa = (Double) a.get("scoreDouban");
+            Double sb = (Double) b.get("scoreDouban");
+            double va = sa != null ? sa : 0.0;
+            double vb = sb != null ? sb : 0.0;
+            return Double.compare(vb, va);
         });
 
         // 保证类型均匀
@@ -89,7 +91,14 @@ public class PersonalizedRecommendServiceImpl implements PersonalizedRecommendSe
         LambdaQueryWrapper<Movie> w = new LambdaQueryWrapper<>();
         w.eq(Movie::getStatus, 1);
         if (!excludeIds.isEmpty()) w.notIn(Movie::getId, excludeIds);
-        applyGenreFilter(w, genres, "genre");
+        if (!genres.isEmpty()) {
+            w.and(inner -> {
+                for (int i = 0; i < Math.min(genres.size(), 3); i++) {
+                    if (i == 0) inner.like(Movie::getGenre, genres.get(i));
+                    else inner.or().like(Movie::getGenre, genres.get(i));
+                }
+            });
+        }
         if (StringUtils.isNotBlank(region)) w.like(Movie::getRegion, region);
         w.orderByDesc(Movie::getScoreDouban);
         w.last("LIMIT " + limit);
@@ -204,20 +213,6 @@ public class PersonalizedRecommendServiceImpl implements PersonalizedRecommendSe
     }
 
     // ========== Genre filter helpers ==========
-
-    @SuppressWarnings("unchecked")
-    private <T> void applyGenreFilter(LambdaQueryWrapper<T> w, List<String> genres, String field) {
-        if (genres.isEmpty()) return;
-        w.and(inner -> {
-            for (int i = 0; i < Math.min(genres.size(), 3); i++) {
-                if (i == 0) {
-                    inner.like(t -> true, field, genres.get(i));
-                } else {
-                    inner.or().like(t -> true, field, genres.get(i));
-                }
-            }
-        });
-    }
 
     private void applyGenreFilterD(LambdaQueryWrapper<Drama> w, List<String> genres) {
         if (genres.isEmpty()) return;
