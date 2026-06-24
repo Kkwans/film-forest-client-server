@@ -96,7 +96,7 @@ public class SearchController {
 
     // ==================== suggest 辅助方法 ====================
 
-    /** 从单表查询标题前缀匹配 */
+    /** 从单表查询标题模糊匹配 */
     private <T> void suggestFromTable(
             com.baomidou.mybatisplus.extension.service.IService<T> service,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
@@ -105,9 +105,9 @@ public class SearchController {
         try {
             Page<T> p = service.page(new Page<>(1, limit),
                     new LambdaQueryWrapper<T>()
-                            .like(titleField, keyword)
-                            .or()
-                            .like(aliasField, keyword));
+                            .and(w -> w.like(titleField, keyword)
+                                    .or()
+                                    .like(aliasField, keyword)));
             for (T entity : p.getRecords()) {
                 // 通过反射获取 title
                 String title = getTitleFromEntity(entity);
@@ -244,7 +244,8 @@ public class SearchController {
                         m.getPosterUrl(), m.getYear(),
                         toDouble(m.getScoreDouban()), toDouble(m.getScoreImdb()), toDouble(m.getScoreRt()),
                         m.getStoryline(), m.getDirector(), m.getActor(),
-                        m.getGenre(), m.getRegion(), m.getDuration(), null, m.getAlias()));
+                        m.getGenre(), m.getRegion(), m.getDuration(), null, m.getAlias(),
+                        toTimestamp(m.getUpdatedAt())));
             }
         } catch (Exception e) {
             log.error("[Search] 电影搜索异常: keyword={}", kw, e);
@@ -264,7 +265,8 @@ public class SearchController {
                         d.getPosterUrl(), d.getYear(),
                         toDouble(d.getScoreDouban()), toDouble(d.getScoreImdb()), null,
                         d.getStoryline(), d.getDirector(), d.getActor(),
-                        d.getGenre(), d.getRegion(), null, d.getTotalEpisode(), d.getAlias()));
+                        d.getGenre(), d.getRegion(), null, d.getTotalEpisode(), d.getAlias(),
+                        toTimestamp(d.getUpdatedAt())));
             }
         } catch (Exception e) {
             log.error("[Search] 剧集搜索异常: keyword={}", kw, e);
@@ -283,7 +285,8 @@ public class SearchController {
                         v.getPosterUrl(), v.getYear(),
                         toDouble(v.getScoreDouban()), null, null,
                         v.getStoryline(), v.getDirector(), v.getActor(),
-                        v.getGenre(), v.getRegion(), null, v.getTotalEpisode(), v.getAlias()));
+                        v.getGenre(), v.getRegion(), null, v.getTotalEpisode(), v.getAlias(),
+                        toTimestamp(v.getUpdatedAt())));
             }
         } catch (Exception e) {
             log.error("[Search] 综艺搜索异常: keyword={}", kw, e);
@@ -303,7 +306,8 @@ public class SearchController {
                         a.getPosterUrl(), a.getYear(),
                         toDouble(a.getScoreDouban()), null, null,
                         a.getStoryline(), a.getDirector(), a.getActor(),
-                        a.getGenre(), a.getRegion(), null, a.getTotalEpisode(), a.getAlias()));
+                        a.getGenre(), a.getRegion(), null, a.getTotalEpisode(), a.getAlias(),
+                        toTimestamp(a.getUpdatedAt())));
             }
         } catch (Exception e) {
             log.error("[Search] 动漫搜索异常: keyword={}", kw, e);
@@ -322,7 +326,8 @@ public class SearchController {
                         s.getPosterUrl(), s.getYear(),
                         null, null, null,
                         s.getStoryline(), null, null,
-                        s.getGenre(), s.getRegion(), null, s.getTotalEpisode(), s.getAlias()));
+                        s.getGenre(), s.getRegion(), null, s.getTotalEpisode(), s.getAlias(),
+                        toTimestamp(s.getUpdatedAt())));
             }
         } catch (Exception e) {
             log.error("[Search] 短剧搜索异常: keyword={}", kw, e);
@@ -334,6 +339,11 @@ public class SearchController {
     /** BigDecimal → Double 安全转换 */
     private Double toDouble(java.math.BigDecimal val) {
         return val != null ? val.doubleValue() : null;
+    }
+
+    /** LocalDateTime → 毫秒时间戳 安全转换 */
+    private Long toTimestamp(java.time.LocalDateTime dt) {
+        return dt != null ? dt.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /** 根据排序字段返回比较器 */
@@ -352,8 +362,8 @@ public class SearchController {
             case "douban":
                 cmp = Comparator.comparingDouble(r -> r.rating != null ? r.rating : 0);
                 break;
-            default: // latest - 默认按豆瓣评分
-                cmp = Comparator.comparingDouble(r -> r.rating != null ? r.rating : 0);
+            default: // latest - 按更新时间排序
+                cmp = Comparator.comparingLong(r -> r.updatedAtMs != null ? r.updatedAtMs : 0);
                 break;
         }
         return desc ? cmp.reversed() : cmp;
@@ -378,7 +388,8 @@ public class SearchController {
             String region,         // JSON数组字符串
             Integer duration,      // 时长（分钟）
             Integer totalEpisode,  // 总集数
-            String alias           // 别名（JSON数组字符串）
+            String alias,          // 别名（JSON数组字符串）
+            Long updatedAtMs       // 更新时间戳（毫秒）
     ) {}
 
     /** 分页包装 */
