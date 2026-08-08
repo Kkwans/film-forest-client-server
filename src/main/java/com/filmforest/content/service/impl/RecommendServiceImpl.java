@@ -58,37 +58,53 @@ public class RecommendServiceImpl implements RecommendService {
                         .orderByDesc(ShortDrama::getScoreDouban)
                         .last("LIMIT " + topN)), "short_drama"));
 
-        // 最新更新：按创建时间降序
+        // 最新更新：每类多取一倍，在内存中排除热门区已出现的内容。
+        int latestCandidateLimit = topN * 2;
         Map<String, List<Map<String, Object>>> latest = new LinkedHashMap<>();
         latest.put("movie", toList(movieService.list(
                 new LambdaQueryWrapper<Movie>()
                         .eq(Movie::getStatus, 1)
-                        .orderByDesc(Movie::getCreatedAt)
-                        .last("LIMIT " + topN)), "movie"));
+                        .orderByDesc(Movie::getUpdatedAt)
+                        .last("LIMIT " + latestCandidateLimit)), "movie"));
         latest.put("drama", toList(dramaService.list(
                 new LambdaQueryWrapper<Drama>()
                         .eq(Drama::getStatus, 1)
-                        .orderByDesc(Drama::getCreatedAt)
-                        .last("LIMIT " + topN)), "drama"));
+                        .orderByDesc(Drama::getUpdatedAt)
+                        .last("LIMIT " + latestCandidateLimit)), "drama"));
         latest.put("variety", toList(varietyService.list(
                 new LambdaQueryWrapper<Variety>()
                         .eq(Variety::getStatus, 1)
-                        .orderByDesc(Variety::getCreatedAt)
-                        .last("LIMIT " + topN)), "variety"));
+                        .orderByDesc(Variety::getUpdatedAt)
+                        .last("LIMIT " + latestCandidateLimit)), "variety"));
         latest.put("anime", toList(animeService.list(
                 new LambdaQueryWrapper<Anime>()
                         .eq(Anime::getStatus, 1)
-                        .orderByDesc(Anime::getCreatedAt)
-                        .last("LIMIT " + topN)), "anime"));
+                        .orderByDesc(Anime::getUpdatedAt)
+                        .last("LIMIT " + latestCandidateLimit)), "anime"));
         latest.put("short_drama", toList(shortDramaService.list(
                 new LambdaQueryWrapper<ShortDrama>()
                         .eq(ShortDrama::getStatus, 1)
-                        .orderByDesc(ShortDrama::getCreatedAt)
-                        .last("LIMIT " + topN)), "short_drama"));
+                        .orderByDesc(ShortDrama::getUpdatedAt)
+                        .last("LIMIT " + latestCandidateLimit)), "short_drama"));
+
+        latest.replaceAll((type, items) -> withoutDuplicateIds(items, hot.get(type), topN));
 
         result.put("hot", hot);
         result.put("latest", latest);
         return result;
+    }
+
+    static List<Map<String, Object>> withoutDuplicateIds(
+            List<Map<String, Object>> candidates,
+            List<Map<String, Object>> alreadyShown,
+            int limit) {
+        Set<Object> shownIds = alreadyShown == null
+                ? Collections.emptySet()
+                : alreadyShown.stream().map(item -> item.get("id")).collect(Collectors.toSet());
+        return candidates.stream()
+                .filter(item -> !shownIds.contains(item.get("id")))
+                .limit(limit)
+                .toList();
     }
 
     /**

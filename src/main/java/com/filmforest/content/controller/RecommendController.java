@@ -28,9 +28,10 @@ public class RecommendController {
     @GetMapping
     public Result<?> recommend(
             @RequestParam(defaultValue = "5") int topN) {
-        log.info("[Recommend] topN={}", topN);
+        int safeTopN = Math.min(12, Math.max(1, topN));
+        log.info("[Recommend] topN={}", safeTopN);
         Map<String, Map<String, java.util.List<java.util.Map<String, Object>>>> data =
-                recommendService.getRecommendations(topN);
+                recommendService.getRecommendations(safeTopN);
         return Result.ok(data);
     }
 }
