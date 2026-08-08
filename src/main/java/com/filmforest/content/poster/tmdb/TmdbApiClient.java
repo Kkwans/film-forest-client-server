@@ -2,6 +2,7 @@ package com.filmforest.content.poster.tmdb;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ public class TmdbApiClient implements Gateway {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public TmdbApiClient(ObjectMapper objectMapper) {
         this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build(), objectMapper);
     }
