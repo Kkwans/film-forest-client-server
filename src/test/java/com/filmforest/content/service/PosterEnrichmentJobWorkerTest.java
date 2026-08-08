@@ -1,11 +1,15 @@
 package com.filmforest.content.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.filmforest.content.entity.ContentPosterMatch;
 import com.filmforest.content.entity.PosterEnrichmentJob;
 import com.filmforest.content.mapper.PosterEnrichmentJobMapper;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.poster.ContentPosterMatchService;
 import com.filmforest.content.poster.PosterBatchContentSource;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -25,6 +29,13 @@ class PosterEnrichmentJobWorkerTest {
     private final PosterEnrichmentService enrichmentService = mock(PosterEnrichmentService.class);
     private final PosterEnrichmentJobWorker worker =
             new PosterEnrichmentJobWorker(mapper, source, matchService, enrichmentService);
+
+    @BeforeEach
+    void initializeTableMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "poster-job-worker-test"),
+                PosterEnrichmentJob.class);
+    }
 
     @Test
     void alreadyAcceptedRowsAdvanceProgressWithoutExternalEnrichment() {

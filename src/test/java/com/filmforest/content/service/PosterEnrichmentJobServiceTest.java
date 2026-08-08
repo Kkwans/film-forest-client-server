@@ -1,11 +1,15 @@
 package com.filmforest.content.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.dto.PosterSettingView;
 import com.filmforest.content.entity.PosterEnrichmentJob;
 import com.filmforest.content.mapper.PosterEnrichmentJobMapper;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.poster.PosterBatchContentSource;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +28,13 @@ class PosterEnrichmentJobServiceTest {
     private final PosterEnrichmentJobWorker worker = mock(PosterEnrichmentJobWorker.class);
     private final PosterEnrichmentJobService service =
             new PosterEnrichmentJobService(mapper, settingService, contentSource, worker);
+
+    @BeforeEach
+    void initializeTableMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "poster-job-service-test"),
+                PosterEnrichmentJob.class);
+    }
 
     @Test
     void explicitStartPersistsScopedJobAndDispatchesWorker() {
