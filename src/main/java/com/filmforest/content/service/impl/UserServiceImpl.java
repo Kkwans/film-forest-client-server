@@ -2,13 +2,13 @@ package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.filmforest.content.entity.PasswordAlgorithm;
 import com.filmforest.content.entity.User;
 import com.filmforest.content.entity.UserRole;
 import com.filmforest.content.mapper.UserMapper;
+import com.filmforest.content.service.PasswordService;
 import com.filmforest.content.service.UserMovieListService;
 import com.filmforest.content.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import cn.hutool.crypto.digest.BCrypt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,8 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
  */
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
-    @Autowired
-    private UserMovieListService userMovieListService;
+    private final UserMovieListService userMovieListService;
+    private final PasswordService passwordService;
+
+    public UserServiceImpl(UserMovieListService userMovieListService, PasswordService passwordService) {
+        this.userMovieListService = userMovieListService;
+        this.passwordService = passwordService;
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -34,7 +39,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 创建用户
         User user = new User();
         user.setUsername(username);
-        user.setPasswordHash(BCrypt.hashpw(password, BCrypt.gensalt()));
+        user.setPasswordHash(passwordService.encode(password));
+        user.setPasswordAlgorithm(PasswordAlgorithm.BCRYPT);
+        user.setMustChangePassword(false);
         user.setEmail(email);
         user.setNickname(username); // 默认昵称为用户名
         user.setStatus(1); // 正常状态
@@ -48,18 +55,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public User login(String username, String password) {
         User user = findByUsername(username);
         if (user == null) {
             throw new RuntimeException("用户名或密码错误");
         }
 
-        if (!BCrypt.checkpw(password, user.getPasswordHash())) {
+        PasswordService.Verification verification = passwordService.verify(
+                password, user.getPasswordHash(), user.getPasswordAlgorithm());
+        if (!verification.matches()) {
             throw new RuntimeException("用户名或密码错误");
         }
 
-        if (user.getStatus() != null && user.getStatus() == 0) {
+        if (!Integer.valueOf(1).equals(user.getStatus())) {
             throw new RuntimeException("账号已被禁用");
+        }
+
+        if (verification.needsUpgrade()) {
+            user.setPasswordHash(passwordService.encode(password));
+            user.setPasswordAlgorithm(PasswordAlgorithm.BCRYPT);
+            updateById(user);
         }
 
         return user;

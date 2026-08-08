@@ -20,6 +20,9 @@ public class User {
     private String phone;           // 手机号
     @JsonIgnore
     private String passwordHash;    // 密码哈希（BCrypt）
+    @JsonIgnore
+    private PasswordAlgorithm passwordAlgorithm;
+    private Boolean mustChangePassword;
     private String nickname;        // 昵称
     private String avatarUrl;       // 头像URL
     private Integer status;         // 状态：0=禁用 1=正常

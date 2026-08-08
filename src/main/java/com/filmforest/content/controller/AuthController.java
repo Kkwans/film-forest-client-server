@@ -84,6 +84,7 @@ public class AuthController {
         map.put("avatarUrl", user.getAvatarUrl());
         map.put("status", user.getStatus());
         map.put("role", user.getRole());
+        map.put("mustChangePassword", Boolean.TRUE.equals(user.getMustChangePassword()));
         map.put("createdAt", user.getCreatedAt());
         return map;
     }
