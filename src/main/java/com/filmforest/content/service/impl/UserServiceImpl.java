@@ -2,6 +2,7 @@ package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.entity.PasswordAlgorithm;
 import com.filmforest.content.entity.User;
 import com.filmforest.content.entity.UserRole;
@@ -33,7 +34,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 检查用户名是否已存在
         User existing = findByUsername(username);
         if (existing != null) {
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException("用户名已存在");
         }
 
         // 创建用户
@@ -59,17 +60,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public User login(String username, String password) {
         User user = findByUsername(username);
         if (user == null) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException("用户名或密码错误");
         }
 
         PasswordService.Verification verification = passwordService.verify(
                 password, user.getPasswordHash(), user.getPasswordAlgorithm());
         if (!verification.matches()) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BusinessException("用户名或密码错误");
         }
 
         if (!Integer.valueOf(1).equals(user.getStatus())) {
-            throw new RuntimeException("账号已被禁用");
+            throw new BusinessException("账号已被禁用");
         }
 
         if (verification.needsUpgrade()) {

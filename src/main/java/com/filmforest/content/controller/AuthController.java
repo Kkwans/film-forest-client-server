@@ -1,8 +1,10 @@
 package com.filmforest.content.controller;
 
 import com.filmforest.common.dto.Result;
+import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.dto.LoginRequest;
 import com.filmforest.content.entity.User;
+import com.filmforest.content.service.LoginAttemptService;
 import com.filmforest.content.service.UserService;
 import com.filmforest.content.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,20 +27,27 @@ public class AuthController {
 
     private final UserService userService;
     private final JwtUtil jwtUtil;
+    private final LoginAttemptService loginAttemptService;
 
-    public AuthController(UserService userService, JwtUtil jwtUtil) {
+    public AuthController(UserService userService, JwtUtil jwtUtil, LoginAttemptService loginAttemptService) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
+        this.loginAttemptService = loginAttemptService;
     }
 
     /**
      * 用户登录
      */
     @PostMapping("/login")
-    public Result<?> login(@Valid @RequestBody LoginRequest request) {
+    public Result<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+        String remoteAddress = servletRequest.getRemoteAddr();
+        if (loginAttemptService.isBlocked(remoteAddress, request.getUsername())) {
+            return Result.fail(429, "登录尝试过多，请稍后再试");
+        }
         log.info("登录请求: username={}", request.getUsername());
         try {
             User user = userService.login(request.getUsername(), request.getPassword());
+            loginAttemptService.recordSuccess(remoteAddress, request.getUsername());
             String token = jwtUtil.generateToken(user.getId(), user.getUsername());
 
             Map<String, Object> data = new HashMap<>();
@@ -46,9 +55,10 @@ public class AuthController {
             data.put("user", sanitizeUser(user));
             log.info("登录成功: userId={}", user.getId());
             return Result.ok(data);
-        } catch (RuntimeException e) {
+        } catch (BusinessException e) {
+            loginAttemptService.recordFailure(remoteAddress, request.getUsername());
             log.warn("登录失败: username={}, reason={}", request.getUsername(), e.getMessage());
-            return Result.fail(400, e.getMessage());
+            return Result.fail(e.getCode(), e.getMessage());
         }
     }
 
