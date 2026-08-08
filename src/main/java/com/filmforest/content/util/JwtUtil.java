@@ -1,9 +1,9 @@
 package com.filmforest.content.util;
 
+import com.filmforest.content.config.JwtProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -16,14 +16,14 @@ import java.util.Date;
 @Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final JwtProperties properties;
 
-    @Value("${jwt.expiration}")
-    private long expiration;
+    public JwtUtil(JwtProperties properties) {
+        this.properties = properties;
+    }
 
     private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(properties.secret().getBytes(StandardCharsets.UTF_8));
     }
 
     /**
@@ -31,9 +31,10 @@ public class JwtUtil {
      */
     public String generateToken(Long userId, String username) {
         Date now = new Date();
-        Date expiryDate = new Date(now.getTime() + expiration);
+        Date expiryDate = new Date(now.getTime() + properties.expiration());
 
         return Jwts.builder()
+                .issuer(properties.issuer())
                 .subject(userId.toString())
                 .claim("username", username)
                 .issuedAt(now)
@@ -48,6 +49,7 @@ public class JwtUtil {
     public Claims parseToken(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
+                .requireIssuer(properties.issuer())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
