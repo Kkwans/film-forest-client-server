@@ -3,9 +3,11 @@ package com.filmforest.content.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.dto.UserListItemVO;
+import com.filmforest.content.dto.ContentStatusQuery;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.service.UserMovieListService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -251,6 +253,21 @@ public class UserMovieListController {
         Long userId = (Long) request.getAttribute("userId");
         Map<Long, List<Map<String, Object>>> result = userMovieListService.getMovieStatusBatch(userId, movieIds, contentType);
         log.debug("[UserList] 批量查询影视状态: userId={}, movieIds={}, contentType={}, resultCount={}", userId, movieIds.size(), contentType, result.size());
+        return Result.ok(result);
+    }
+
+    /**
+     * 批量查询异构内容状态。请求和响应都以 contentType + contentId 唯一定位，
+     * 避免不同内容表中相同数字 ID 相互覆盖。
+     */
+    @PostMapping("/movie-status-batch")
+    public Result<?> getMixedContentStatusBatch(
+            HttpServletRequest request,
+            @Valid @RequestBody List<@Valid ContentStatusQuery> queries) {
+        Long userId = (Long) request.getAttribute("userId");
+        var result = userMovieListService.getContentStatusBatch(userId, queries);
+        log.debug("[UserList] 混合批量状态: userId={}, queryCount={}, resultCount={}",
+                userId, queries.size(), result.size());
         return Result.ok(result);
     }
 }

@@ -3,6 +3,8 @@ package com.filmforest.content.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.spring.service.IService;
 import com.filmforest.content.dto.UserListItemVO;
+import com.filmforest.content.dto.ContentStatusQuery;
+import com.filmforest.content.dto.ContentStatusResult;
 import com.filmforest.content.entity.UserMovieList;
 
 import java.math.BigDecimal;
@@ -65,6 +67,11 @@ public interface UserMovieListService extends IService<UserMovieList> {
      * 批量查询影视在哪些片单中（共享片单查询，避免重复查库）
      */
     Map<Long, List<Map<String, Object>>> getMovieStatusBatch(Long userId, List<Long> movieIds, String contentType);
+
+    /**
+     * 批量查询不同类型内容的片单状态。
+     */
+    List<ContentStatusResult> getContentStatusBatch(Long userId, List<ContentStatusQuery> queries);
 
     /**
      * 批量从片单移除影视

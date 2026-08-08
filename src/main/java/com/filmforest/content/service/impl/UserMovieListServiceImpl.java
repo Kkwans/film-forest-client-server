@@ -6,9 +6,13 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.dto.UserListItemVO;
+import com.filmforest.content.dto.ContentStatusQuery;
+import com.filmforest.content.dto.ContentStatusResult;
 import com.filmforest.content.entity.*;
 import com.filmforest.content.mapper.*;
 import com.filmforest.content.service.UserMovieListService;
+import com.filmforest.content.model.ContentType;
+import com.filmforest.common.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -523,5 +527,77 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             result.put(movieId, getMovieStatusInternal(userId, movieId, contentType, lists));
         }
         return result;
+    }
+
+    @Override
+    public List<ContentStatusResult> getContentStatusBatch(Long userId, List<ContentStatusQuery> queries) {
+        if (queries == null || queries.isEmpty()) {
+            return Collections.emptyList();
+        }
+        if (queries.size() > 200) {
+            throw new BusinessException("单次最多查询 200 个内容状态");
+        }
+
+        LinkedHashMap<ContentKey, ContentStatusQuery> normalizedQueries = new LinkedHashMap<>();
+        for (ContentStatusQuery query : queries) {
+            if (query == null || query.contentId() == null) {
+                throw new BusinessException("contentId 不能为空");
+            }
+            ContentType type = ContentType.parse(query.contentType());
+            ContentKey key = new ContentKey(type.code(), query.contentId());
+            normalizedQueries.putIfAbsent(key, new ContentStatusQuery(type.code(), query.contentId()));
+        }
+
+        List<UserMovieList> lists = list(new LambdaQueryWrapper<UserMovieList>()
+                .eq(UserMovieList::getUserId, userId)
+                .orderByAsc(UserMovieList::getIsDefault)
+                .orderByDesc(UserMovieList::getCreatedAt));
+        if (lists.isEmpty()) {
+            return normalizedQueries.keySet().stream()
+                    .map(key -> new ContentStatusResult(key.contentType(), key.contentId(), Collections.emptyList()))
+                    .toList();
+        }
+
+        List<Long> listIds = lists.stream().map(UserMovieList::getId).toList();
+        Set<Long> contentIds = normalizedQueries.keySet().stream().map(ContentKey::contentId).collect(Collectors.toSet());
+        Set<String> contentTypes = normalizedQueries.keySet().stream().map(ContentKey::contentType).collect(Collectors.toSet());
+        List<UserMovieListItem> items = itemMapper.selectList(new LambdaQueryWrapper<UserMovieListItem>()
+                .in(UserMovieListItem::getListId, listIds)
+                .in(UserMovieListItem::getMovieId, contentIds)
+                .in(UserMovieListItem::getContentType, contentTypes));
+
+        Map<ContentKey, Map<Long, UserMovieListItem>> itemsByContent = items.stream()
+                .filter(item -> normalizedQueries.containsKey(new ContentKey(item.getContentType(), item.getMovieId())))
+                .collect(Collectors.groupingBy(
+                        item -> new ContentKey(item.getContentType(), item.getMovieId()),
+                        Collectors.toMap(UserMovieListItem::getListId, Function.identity(), (a, b) -> a)));
+
+        return normalizedQueries.keySet().stream()
+                .map(key -> new ContentStatusResult(
+                        key.contentType(),
+                        key.contentId(),
+                        buildStatuses(lists, itemsByContent.getOrDefault(key, Collections.emptyMap()))))
+                .toList();
+    }
+
+    private List<Map<String, Object>> buildStatuses(
+            List<UserMovieList> lists,
+            Map<Long, UserMovieListItem> itemsByList) {
+        return lists.stream().map(list -> {
+            Map<String, Object> status = new LinkedHashMap<>();
+            status.put("listId", list.getId());
+            status.put("listName", list.getName());
+            status.put("type", list.getType());
+            UserMovieListItem item = itemsByList.get(list.getId());
+            status.put("added", item != null);
+            if (item != null) {
+                status.put("userRating", item.getRating());
+                status.put("note", item.getNote());
+            }
+            return status;
+        }).toList();
+    }
+
+    private record ContentKey(String contentType, Long contentId) {
     }
 }
