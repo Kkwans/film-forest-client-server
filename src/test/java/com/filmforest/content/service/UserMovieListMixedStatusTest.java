@@ -1,6 +1,8 @@
 package com.filmforest.content.service;
 
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.filmforest.content.dto.ContentStatusQuery;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.entity.UserMovieListItem;
@@ -11,6 +13,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -29,6 +32,9 @@ class UserMovieListMixedStatusTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-test"),
+                UserMovieListItem.class);
         service = new UserMovieListServiceImpl();
         ReflectionTestUtils.setField(service, "baseMapper", listMapper);
         ReflectionTestUtils.setField(service, "itemMapper", itemMapper);
