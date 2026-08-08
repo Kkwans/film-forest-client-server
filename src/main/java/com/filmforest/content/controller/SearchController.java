@@ -3,7 +3,9 @@ package com.filmforest.content.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.dto.PageResult;
 import com.filmforest.content.entity.*;
+import com.filmforest.content.model.ContentType;
 import com.filmforest.content.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Slf4j
 /**
@@ -56,42 +57,24 @@ public class SearchController {
         return Result.ok(suggestions);
     }
 
-    /**
-     * 热门搜索：返回各类型评分最高的内容标题 Top 10
-     * 用评分最高的内容作为"热门搜索词"（无需额外搜索日志表）
-     */
+    /** 热门搜索：基于真实搜索日志聚合近 30 天关键词。 */
     @GetMapping("/hot")
     public Result<?> hotSearch() {
         log.debug("[Search] hot search");
-        int perTableLimit = 4;
-        List<Map<String, Object>> hotItems = new ArrayList<>();
-
-        // 从各类型取评分 Top N
-        addHotItems(movieService.list(
-                new LambdaQueryWrapper<Movie>()
-                        .eq(Movie::getStatus, 1)
-                        .orderByDesc(Movie::getScoreDouban)
-                        .last("LIMIT " + perTableLimit)), hotItems, "movie");
-        addHotItems(dramaService.list(
-                new LambdaQueryWrapper<Drama>()
-                        .eq(Drama::getStatus, 1)
-                        .orderByDesc(Drama::getScoreDouban)
-                        .last("LIMIT " + perTableLimit)), hotItems, "drama");
-        addHotItems(animeService.list(
-                new LambdaQueryWrapper<Anime>()
-                        .eq(Anime::getStatus, 1)
-                        .orderByDesc(Anime::getScoreDouban)
-                        .last("LIMIT " + perTableLimit)), hotItems, "anime");
-
-        // 按评分排序取 top 10
-        hotItems.sort((a, b) -> {
-            Double sa = (Double) a.getOrDefault("score", 0.0);
-            Double sb = (Double) b.getOrDefault("score", 0.0);
-            return Double.compare(sb, sa);
-        });
-
-        List<Map<String, Object>> result = hotItems.stream().limit(10).collect(Collectors.toList());
-        return Result.ok(result);
+        try {
+            return Result.ok(jdbcTemplate.queryForList("""
+                    SELECT keyword AS title, COUNT(*) AS searchCount, MAX(created_at) AS lastSearchedAt
+                    FROM search_log
+                    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                      AND keyword IS NOT NULL AND keyword <> ''
+                    GROUP BY keyword
+                    ORDER BY searchCount DESC, lastSearchedAt DESC
+                    LIMIT 10
+                    """));
+        } catch (Exception e) {
+            log.warn("[Search] 热门词聚合失败", e);
+            return Result.ok(Collections.emptyList());
+        }
     }
 
     // ==================== suggest 辅助方法 ====================
@@ -131,32 +114,6 @@ public class SearchController {
         }
     }
 
-    /** 添加热门条目 */
-    private void addHotItems(List<?> entities, List<Map<String, Object>> hotItems, String type) {
-        for (Object entity : entities) {
-            try {
-                Map<String, Object> item = new LinkedHashMap<>();
-                item.put("type", type);
-                if (entity instanceof Movie m) {
-                    item.put("id", m.getId());
-                    item.put("title", m.getTitle());
-                    item.put("score", m.getScoreDouban() != null ? m.getScoreDouban().doubleValue() : 0.0);
-                } else if (entity instanceof Drama d) {
-                    item.put("id", d.getId());
-                    item.put("title", d.getTitle());
-                    item.put("score", d.getScoreDouban() != null ? d.getScoreDouban().doubleValue() : 0.0);
-                } else if (entity instanceof Anime a) {
-                    item.put("id", a.getId());
-                    item.put("title", a.getTitle());
-                    item.put("score", a.getScoreDouban() != null ? a.getScoreDouban().doubleValue() : 0.0);
-                }
-                hotItems.add(item);
-            } catch (Exception e) {
-                log.error("[Search] hot item 处理异常", e);
-            }
-        }
-    }
-
     /**
      * 全局搜索（合并电影/剧集/综艺/动漫/短剧）
      * 使用堆排序避免全量排序，只维护 top-N 结果
@@ -166,6 +123,7 @@ public class SearchController {
             @RequestParam String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String typeFilter,
             @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
@@ -175,45 +133,29 @@ public class SearchController {
         }
 
         String kw = keyword.trim();
-        log.debug("[Search] keyword={}, page={}, size={}, sort={}, sortDir={}", kw, page, size, sort, sortDir);
-        int from = (page - 1) * size;
-
-        int perTableLimit = Math.max(size, 50);
+        int safePage = Math.max(1, page);
+        int safeSize = Math.min(100, Math.max(1, size));
+        long from = (safePage - 1L) * safeSize;
+        long perTableLimit = from + safeSize;
+        Set<ContentType> selectedTypes = parseTypeFilter(typeFilter);
+        boolean desc = "desc".equalsIgnoreCase(sortDir);
+        log.debug("[Search] keyword={}, page={}, size={}, types={}, sort={}, sortDir={}",
+                kw, safePage, safeSize, selectedTypes, sort, sortDir);
 
         List<SearchResult> allResults = new ArrayList<>();
 
-        // 分别从 5 张表搜索（各表独立 try-catch，单表失败不影响其他）
-        searchMovies(kw, perTableLimit, allResults);
-        searchDramas(kw, perTableLimit, allResults);
-        searchVarieties(kw, perTableLimit, allResults);
-        searchAnimes(kw, perTableLimit, allResults);
-        searchShortDramas(kw, perTableLimit, allResults);
+        long total = 0;
+        if (selectedTypes.contains(ContentType.MOVIE)) total += searchMovies(kw, perTableLimit, sort, desc, allResults);
+        if (selectedTypes.contains(ContentType.DRAMA)) total += searchDramas(kw, perTableLimit, sort, desc, allResults);
+        if (selectedTypes.contains(ContentType.VARIETY)) total += searchVarieties(kw, perTableLimit, sort, desc, allResults);
+        if (selectedTypes.contains(ContentType.ANIME)) total += searchAnimes(kw, perTableLimit, sort, desc, allResults);
+        if (selectedTypes.contains(ContentType.SHORT_DRAMA)) total += searchShortDramas(kw, perTableLimit, sort, desc, allResults);
 
-        // 堆排序：只维护 top-(from+size) 个元素
-        boolean desc = "desc".equalsIgnoreCase(sortDir);
         Comparator<SearchResult> comparator = getSearchResultComparator(sort, desc);
-        int need = from + size;
-        PriorityQueue<SearchResult> heap = new PriorityQueue<>(need + 1, comparator);
-
-        for (SearchResult r : allResults) {
-            heap.offer(r);
-            if (heap.size() > need) {
-                heap.poll();
-            }
-        }
-
-        // 从堆中取出结果（逆序）
-        List<SearchResult> sorted = new ArrayList<>(heap.size());
-        while (!heap.isEmpty()) {
-            sorted.add(heap.poll());
-        }
-        Collections.reverse(sorted);
-
-        // 分页截取
-        int total = allResults.size();
-        List<SearchResult> pageData = sorted.stream()
+        List<SearchResult> pageData = allResults.stream()
+                .sorted(comparator.thenComparing(SearchResult::type).thenComparing(SearchResult::id))
                 .skip(from)
-                .limit(size)
+                .limit(safeSize)
                 .collect(Collectors.toList());
 
         // 记录搜索日志
@@ -225,19 +167,22 @@ public class SearchController {
             log.warn("[Search] 记录搜索日志失败: {}", kw, e);
         }
 
-        return Result.ok(new PageWrap<>(pageData, total, size));
+        long pages = total == 0 ? 0 : (total + safeSize - 1) / safeSize;
+        return Result.ok(new PageResult<>(pageData, total, safeSize, safePage, pages));
     }
 
     // ==================== 各类型搜索方法 ====================
 
-    private void searchMovies(String kw, int limit, List<SearchResult> results) {
+    private long searchMovies(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
-            Page<Movie> p = movieService.page(new Page<>(1, limit),
-                    new LambdaQueryWrapper<Movie>()
-                            .like(Movie::getTitle, kw)
+            LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<Movie>()
+                    .eq(Movie::getStatus, 1)
+                    .and(w -> w.like(Movie::getTitle, kw)
                             .or().like(Movie::getAlias, kw)
                             .or().like(Movie::getActor, kw)
                             .or().like(Movie::getDirector, kw));
+            applyMovieSort(wrapper, sort, !desc);
+            Page<Movie> p = movieService.page(new Page<>(1, limit), wrapper);
             for (Movie m : p.getRecords()) {
                 results.add(new SearchResult(
                         m.getId(), "movie", m.getTitle(),
@@ -247,18 +192,22 @@ public class SearchController {
                         m.getGenre(), m.getRegion(), m.getDuration(), null, m.getAlias(),
                         toTimestamp(m.getUpdatedAt())));
             }
+            return p.getTotal();
         } catch (Exception e) {
             log.error("[Search] 电影搜索异常: keyword={}", kw, e);
+            throw new IllegalStateException("电影搜索失败", e);
         }
     }
 
-    private void searchDramas(String kw, int limit, List<SearchResult> results) {
+    private long searchDramas(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
-            Page<Drama> p = dramaService.page(new Page<>(1, limit),
-                    new LambdaQueryWrapper<Drama>()
-                            .like(Drama::getTitle, kw)
+            LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<Drama>()
+                    .eq(Drama::getStatus, 1)
+                    .and(w -> w.like(Drama::getTitle, kw)
                             .or().like(Drama::getAlias, kw)
                             .or().like(Drama::getActor, kw));
+            applyDramaSort(wrapper, sort, !desc);
+            Page<Drama> p = dramaService.page(new Page<>(1, limit), wrapper);
             for (Drama d : p.getRecords()) {
                 results.add(new SearchResult(
                         d.getId(), "drama", d.getTitle(),
@@ -268,17 +217,20 @@ public class SearchController {
                         d.getGenre(), d.getRegion(), null, d.getTotalEpisode(), d.getAlias(),
                         toTimestamp(d.getUpdatedAt())));
             }
+            return p.getTotal();
         } catch (Exception e) {
             log.error("[Search] 剧集搜索异常: keyword={}", kw, e);
+            throw new IllegalStateException("剧集搜索失败", e);
         }
     }
 
-    private void searchVarieties(String kw, int limit, List<SearchResult> results) {
+    private long searchVarieties(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
-            Page<Variety> p = varietyService.page(new Page<>(1, limit),
-                    new LambdaQueryWrapper<Variety>()
-                            .like(Variety::getTitle, kw)
-                            .or().like(Variety::getAlias, kw));
+            LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<Variety>()
+                    .eq(Variety::getStatus, 1)
+                    .and(w -> w.like(Variety::getTitle, kw).or().like(Variety::getAlias, kw));
+            applyVarietySort(wrapper, sort, !desc);
+            Page<Variety> p = varietyService.page(new Page<>(1, limit), wrapper);
             for (Variety v : p.getRecords()) {
                 results.add(new SearchResult(
                         v.getId(), "variety", v.getTitle(),
@@ -288,18 +240,22 @@ public class SearchController {
                         v.getGenre(), v.getRegion(), null, v.getTotalEpisode(), v.getAlias(),
                         toTimestamp(v.getUpdatedAt())));
             }
+            return p.getTotal();
         } catch (Exception e) {
             log.error("[Search] 综艺搜索异常: keyword={}", kw, e);
+            throw new IllegalStateException("综艺搜索失败", e);
         }
     }
 
-    private void searchAnimes(String kw, int limit, List<SearchResult> results) {
+    private long searchAnimes(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
-            Page<Anime> p = animeService.page(new Page<>(1, limit),
-                    new LambdaQueryWrapper<Anime>()
-                            .like(Anime::getTitle, kw)
+            LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<Anime>()
+                    .eq(Anime::getStatus, 1)
+                    .and(w -> w.like(Anime::getTitle, kw)
                             .or().like(Anime::getAlias, kw)
                             .or().like(Anime::getActor, kw));
+            applyAnimeSort(wrapper, sort, !desc);
+            Page<Anime> p = animeService.page(new Page<>(1, limit), wrapper);
             for (Anime a : p.getRecords()) {
                 results.add(new SearchResult(
                         a.getId(), "anime", a.getTitle(),
@@ -309,17 +265,20 @@ public class SearchController {
                         a.getGenre(), a.getRegion(), null, a.getTotalEpisode(), a.getAlias(),
                         toTimestamp(a.getUpdatedAt())));
             }
+            return p.getTotal();
         } catch (Exception e) {
             log.error("[Search] 动漫搜索异常: keyword={}", kw, e);
+            throw new IllegalStateException("动漫搜索失败", e);
         }
     }
 
-    private void searchShortDramas(String kw, int limit, List<SearchResult> results) {
+    private long searchShortDramas(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
-            Page<ShortDrama> p = shortDramaService.page(new Page<>(1, limit),
-                    new LambdaQueryWrapper<ShortDrama>()
-                            .like(ShortDrama::getTitle, kw)
-                            .or().like(ShortDrama::getAlias, kw));
+            LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<ShortDrama>()
+                    .eq(ShortDrama::getStatus, 1)
+                    .and(w -> w.like(ShortDrama::getTitle, kw).or().like(ShortDrama::getAlias, kw));
+            applyShortDramaSort(wrapper, sort, !desc);
+            Page<ShortDrama> p = shortDramaService.page(new Page<>(1, limit), wrapper);
             for (ShortDrama s : p.getRecords()) {
                 results.add(new SearchResult(
                         s.getId(), "short_drama", s.getTitle(),
@@ -329,12 +288,73 @@ public class SearchController {
                         s.getGenre(), s.getRegion(), null, s.getTotalEpisode(), s.getAlias(),
                         toTimestamp(s.getUpdatedAt())));
             }
+            return p.getTotal();
         } catch (Exception e) {
             log.error("[Search] 短剧搜索异常: keyword={}", kw, e);
+            throw new IllegalStateException("短剧搜索失败", e);
         }
     }
 
     // ==================== 工具方法 ====================
+
+    static Set<ContentType> parseTypeFilter(String raw) {
+        if (raw == null || raw.isBlank() || "all".equalsIgnoreCase(raw.trim())) {
+            return EnumSet.allOf(ContentType.class);
+        }
+        EnumSet<ContentType> selected = EnumSet.noneOf(ContentType.class);
+        Arrays.stream(raw.split(","))
+                .filter(value -> !value.isBlank())
+                .map(ContentType::parse)
+                .forEach(selected::add);
+        return selected.isEmpty() ? EnumSet.allOf(ContentType.class) : selected;
+    }
+
+    private void applyMovieSort(LambdaQueryWrapper<Movie> wrapper, String sort, boolean asc) {
+        switch (sort) {
+            case "year" -> wrapper.orderBy(true, asc, Movie::getYear);
+            case "douban" -> wrapper.orderBy(true, asc, Movie::getScoreDouban);
+            case "imdb" -> wrapper.orderBy(true, asc, Movie::getScoreImdb);
+            case "rt" -> wrapper.orderBy(true, asc, Movie::getScoreRt);
+            default -> wrapper.orderBy(true, asc, Movie::getUpdatedAt);
+        }
+    }
+
+    private void applyDramaSort(LambdaQueryWrapper<Drama> wrapper, String sort, boolean asc) {
+        switch (sort) {
+            case "year" -> wrapper.orderBy(true, asc, Drama::getYear);
+            case "douban" -> wrapper.orderBy(true, asc, Drama::getScoreDouban);
+            case "imdb" -> wrapper.orderBy(true, asc, Drama::getScoreImdb);
+            case "rt" -> wrapper.orderBy(true, asc, Drama::getId);
+            default -> wrapper.orderBy(true, asc, Drama::getUpdatedAt);
+        }
+    }
+
+    private void applyVarietySort(LambdaQueryWrapper<Variety> wrapper, String sort, boolean asc) {
+        switch (sort) {
+            case "year" -> wrapper.orderBy(true, asc, Variety::getYear);
+            case "douban" -> wrapper.orderBy(true, asc, Variety::getScoreDouban);
+            case "imdb", "rt" -> wrapper.orderBy(true, asc, Variety::getId);
+            default -> wrapper.orderBy(true, asc, Variety::getUpdatedAt);
+        }
+    }
+
+    private void applyAnimeSort(LambdaQueryWrapper<Anime> wrapper, String sort, boolean asc) {
+        switch (sort) {
+            case "year" -> wrapper.orderBy(true, asc, Anime::getYear);
+            case "douban" -> wrapper.orderBy(true, asc, Anime::getScoreDouban);
+            case "imdb", "rt" -> wrapper.orderBy(true, asc, Anime::getId);
+            default -> wrapper.orderBy(true, asc, Anime::getUpdatedAt);
+        }
+    }
+
+    private void applyShortDramaSort(LambdaQueryWrapper<ShortDrama> wrapper, String sort, boolean asc) {
+        switch (sort) {
+            case "year" -> wrapper.orderBy(true, asc, ShortDrama::getYear);
+            case "douban" -> wrapper.orderBy(true, asc, ShortDrama::getScoreDouban);
+            case "imdb", "rt" -> wrapper.orderBy(true, asc, ShortDrama::getId);
+            default -> wrapper.orderBy(true, asc, ShortDrama::getUpdatedAt);
+        }
+    }
 
     /** BigDecimal → Double 安全转换 */
     private Double toDouble(java.math.BigDecimal val) {
@@ -392,10 +412,4 @@ public class SearchController {
             Long updatedAtMs       // 更新时间戳（毫秒）
     ) {}
 
-    /** 分页包装 */
-    public record PageWrap<T>(List<T> records, long total, long size) {
-        public long getPages() {
-            return (total + size - 1) / size;
-        }
-    }
 }
