@@ -1,6 +1,6 @@
 package com.filmforest.resource.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.spring.service.IService;
 import com.filmforest.resource.entity.ResourceMagnet;
 
 import java.util.List;

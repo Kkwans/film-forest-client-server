@@ -98,7 +98,7 @@ public class SearchController {
 
     /** 从单表查询标题模糊匹配 */
     private <T> void suggestFromTable(
-            com.baomidou.mybatisplus.extension.service.IService<T> service,
+            com.baomidou.mybatisplus.spring.service.IService<T> service,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> aliasField,
             String keyword, int limit, Set<String> seen) {

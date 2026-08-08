@@ -1,7 +1,7 @@
 package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.entity.PasswordAlgorithm;
 import com.filmforest.content.entity.User;

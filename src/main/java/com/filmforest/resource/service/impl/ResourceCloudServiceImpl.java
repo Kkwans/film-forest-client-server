@@ -1,6 +1,6 @@
 package com.filmforest.resource.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceCloud;
 import com.filmforest.resource.mapper.ResourceCloudMapper;
 import com.filmforest.resource.service.ResourceCloudService;
