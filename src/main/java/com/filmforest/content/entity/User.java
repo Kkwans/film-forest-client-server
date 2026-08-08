@@ -1,6 +1,7 @@
 package com.filmforest.content.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import java.time.LocalDateTime;
 
@@ -17,10 +18,12 @@ public class User {
     private String username;        // 用户名
     private String email;           // 邮箱
     private String phone;           // 手机号
+    @JsonIgnore
     private String passwordHash;    // 密码哈希（BCrypt）
     private String nickname;        // 昵称
     private String avatarUrl;       // 头像URL
     private Integer status;         // 状态：0=禁用 1=正常
+    private UserRole role;          // USER=家庭用户 ADMIN=管理员
 
     @TableLogic
     @TableField("is_deleted")

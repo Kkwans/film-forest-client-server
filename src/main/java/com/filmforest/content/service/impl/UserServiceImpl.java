@@ -3,6 +3,7 @@ package com.filmforest.content.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.filmforest.content.entity.User;
+import com.filmforest.content.entity.UserRole;
 import com.filmforest.content.mapper.UserMapper;
 import com.filmforest.content.service.UserMovieListService;
 import com.filmforest.content.service.UserService;
@@ -37,6 +38,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         user.setEmail(email);
         user.setNickname(username); // 默认昵称为用户名
         user.setStatus(1); // 正常状态
+        user.setRole(UserRole.USER);
         save(user);
 
         // 创建默认片单

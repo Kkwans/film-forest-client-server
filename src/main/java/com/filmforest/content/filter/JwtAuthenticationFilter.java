@@ -2,7 +2,11 @@ package com.filmforest.content.filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.entity.User;
+import com.filmforest.content.service.UserService;
 import com.filmforest.content.util.JwtUtil;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,11 +40,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     );
 
     private final JwtUtil jwtUtil;
+    private final UserService userService;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserService userService) {
         this.jwtUtil = jwtUtil;
+        this.userService = userService;
     }
 
     @Override
@@ -59,16 +65,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         String token = authHeader.substring(7);
-        if (!jwtUtil.validateToken(token)) {
+        final Claims claims;
+        final Long userId;
+        try {
+            claims = jwtUtil.parseToken(token);
+            userId = Long.parseLong(claims.getSubject());
+        } catch (JwtException | IllegalArgumentException ignored) {
             writeError(response, 401, "Token无效或已过期，请重新登录");
             return;
         }
 
-        // 将用户信息存入 request attribute
-        Long userId = jwtUtil.getUserId(token);
-        String username = jwtUtil.getUsername(token);
-        request.setAttribute("userId", userId);
-        request.setAttribute("username", username);
+        User user = userService.getById(userId);
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())
+                || Integer.valueOf(1).equals(user.getDeleted())) {
+            writeError(response, 401, "登录状态已失效，请重新登录");
+            return;
+        }
+
+        request.setAttribute("userId", user.getId());
+        request.setAttribute("username", user.getUsername());
+        request.setAttribute("role", user.getRole());
 
         filterChain.doFilter(request, response);
     }

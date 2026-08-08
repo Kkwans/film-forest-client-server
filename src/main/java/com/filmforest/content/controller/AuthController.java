@@ -83,6 +83,7 @@ public class AuthController {
         map.put("phone", user.getPhone());
         map.put("avatarUrl", user.getAvatarUrl());
         map.put("status", user.getStatus());
+        map.put("role", user.getRole());
         map.put("createdAt", user.getCreatedAt());
         return map;
     }
