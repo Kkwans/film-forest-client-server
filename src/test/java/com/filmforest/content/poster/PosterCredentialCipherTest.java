@@ -2,6 +2,7 @@ package com.filmforest.content.poster;
 
 import com.filmforest.content.config.PosterCredentialProperties;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 
 import java.util.Base64;
 
@@ -26,5 +27,18 @@ class PosterCredentialCipherTest {
         assertThatThrownBy(() -> cipher.decrypt(8L, first.ciphertext(), first.iv(), first.keyVersion()))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageNotContaining("test-credential-value");
+    }
+
+    @Test
+    void springSelectsTheProductionConstructorWhenTestConstructorAlsoExists() {
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(PosterCredentialProperties.class, () -> new PosterCredentialProperties(
+                    Base64.getEncoder().encodeToString(
+                            "0123456789abcdef0123456789abcdef".getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+            context.register(PosterCredentialCipher.class);
+            context.refresh();
+
+            assertThat(context.getBean(PosterCredentialCipher.class)).isNotNull();
+        }
     }
 }

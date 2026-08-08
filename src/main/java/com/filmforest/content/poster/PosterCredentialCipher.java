@@ -1,6 +1,7 @@
 package com.filmforest.content.poster;
 
 import com.filmforest.content.config.PosterCredentialProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.Cipher;
@@ -19,6 +20,7 @@ public class PosterCredentialCipher {
     private final PosterCredentialProperties properties;
     private final SecureRandom secureRandom;
 
+    @Autowired
     public PosterCredentialCipher(PosterCredentialProperties properties) {
         this(properties, new SecureRandom());
     }
