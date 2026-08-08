@@ -51,6 +51,8 @@ jwt:
 app:
   cors:
     allowed-origins: ${FILM_FOREST_CLIENT_CORS_ORIGINS:http://localhost:3000}
+  poster:
+    credential-encryption-key: ${FILM_FOREST_POSTER_CREDENTIAL_KEY:}
 
 logging:
   level:

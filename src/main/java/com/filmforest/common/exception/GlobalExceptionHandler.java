@@ -49,6 +49,12 @@ public class GlobalExceptionHandler {
         return Result.fail(e.getCode(), e.getMessage());
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public Result<?> handleIllegalArgument(IllegalArgumentException e) {
+        log.warn("请求参数无效: {}", e.getMessage());
+        return Result.fail(HttpStatus.BAD_REQUEST.value(), e.getMessage());
+    }
+
     /** 兜底：未预期的异常 */
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception e) {
