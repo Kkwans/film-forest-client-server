@@ -39,7 +39,7 @@ class UserPosterSettingServiceTest {
     @Test
     void saveCredentialScopesCiphertextToAuthenticatedUserAndReturnsOnlyMask() {
         when(mapper.selectById(7L)).thenReturn(null);
-        when(mapper.insert(any())).thenReturn(1);
+        when(mapper.insert(any(UserPosterSetting.class))).thenReturn(1);
 
         var view = service.saveCredential(7L, "API_KEY", "test-api-key-1234567890");
 
