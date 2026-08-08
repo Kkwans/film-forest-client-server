@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.entity.Anime;
 import com.filmforest.content.mapper.AnimeMapper;
 import com.filmforest.content.service.AnimeService;
+import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.model.ContentType;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +18,15 @@ import org.springframework.stereotype.Service;
  */
 public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements AnimeService {
 
+    private final ContentTagLookupService contentTagLookupService;
+
+    public AnimeServiceImpl(ContentTagLookupService contentTagLookupService) {
+        this.contentTagLookupService = contentTagLookupService;
+    }
+
     @Override
     public IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                  Integer yearFrom, Integer yearTo, String sortDir) {
+                                  Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         Page<Anime> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<>();
 
@@ -31,6 +39,7 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
 
         wrapper.like(StringUtils.isNotBlank(region), Anime::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Anime::getGenre, genre);
+        contentTagLookupService.apply(wrapper, Anime::getId, tagId, ContentType.ANIME);
 
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
         if ("douban".equals(sort)) {

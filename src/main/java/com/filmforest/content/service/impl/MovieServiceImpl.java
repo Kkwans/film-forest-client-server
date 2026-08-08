@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.entity.Movie;
 import com.filmforest.content.mapper.MovieMapper;
 import com.filmforest.content.service.MovieService;
+import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.model.ContentType;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +18,15 @@ import org.springframework.stereotype.Service;
  */
 public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements MovieService {
 
+    private final ContentTagLookupService contentTagLookupService;
+
+    public MovieServiceImpl(ContentTagLookupService contentTagLookupService) {
+        this.contentTagLookupService = contentTagLookupService;
+    }
+
     @Override
     public IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                  Integer yearFrom, Integer yearTo, String sortDir) {
+                                  Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         Page<Movie> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<>();
 
@@ -35,6 +43,7 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
 
         // 类型筛选（模糊匹配 JSON 字符串）
         wrapper.like(StringUtils.isNotBlank(genre), Movie::getGenre, genre);
+        contentTagLookupService.apply(wrapper, Movie::getId, tagId, ContentType.MOVIE);
 
         // 排序
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);

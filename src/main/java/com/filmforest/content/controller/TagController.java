@@ -8,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 标签管理接口
@@ -25,9 +24,10 @@ public class TagController {
      * 获取所有标签
      */
     @GetMapping
-    public Result<?> getAllTags() {
-        List<Tag> tags = tagService.getAllTags();
-        return Result.ok(tags);
+    public Result<?> getAllTags(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        return Result.ok(com.filmforest.content.dto.PageResult.from(tagService.pageTags(page, size)));
     }
 
     /**
@@ -59,7 +59,6 @@ public class TagController {
             @RequestParam(required = false) String contentType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        List<Map<String, Object>> items = tagService.getContentIdsByTag(tagId, contentType, page, size);
-        return Result.ok(items);
+        return Result.ok(tagService.getContentIdsByTag(tagId, contentType, page, size));
     }
 }

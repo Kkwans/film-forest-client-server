@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.entity.ShortDrama;
 import com.filmforest.content.mapper.ShortDramaMapper;
 import com.filmforest.content.service.ShortDramaService;
+import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.model.ContentType;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +18,15 @@ import org.springframework.stereotype.Service;
  */
 public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDrama> implements ShortDramaService {
 
+    private final ContentTagLookupService contentTagLookupService;
+
+    public ShortDramaServiceImpl(ContentTagLookupService contentTagLookupService) {
+        this.contentTagLookupService = contentTagLookupService;
+    }
+
     @Override
     public IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                       Integer yearFrom, Integer yearTo, String sortDir) {
+                                       Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         Page<ShortDrama> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<>();
 
@@ -31,6 +39,7 @@ public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDr
 
         wrapper.like(StringUtils.isNotBlank(region), ShortDrama::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), ShortDrama::getGenre, genre);
+        contentTagLookupService.apply(wrapper, ShortDrama::getId, tagId, ContentType.SHORT_DRAMA);
 
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
         if ("year".equals(sort)) {

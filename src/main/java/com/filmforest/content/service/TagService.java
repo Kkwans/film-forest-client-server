@@ -1,6 +1,8 @@
 package com.filmforest.content.service;
 
 import com.baomidou.mybatisplus.spring.service.IService;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.filmforest.content.dto.PageResult;
 import com.filmforest.content.entity.Tag;
 
 import java.util.List;
@@ -12,6 +14,9 @@ public interface TagService extends IService<Tag> {
      * 获取所有标签（按使用次数降序）
      */
     List<Tag> getAllTags();
+
+    /** 获取标签分页。 */
+    IPage<Tag> pageTags(int page, int size);
 
     /**
      * 获取热门标签 Top N
@@ -46,7 +51,7 @@ public interface TagService extends IService<Tag> {
     /**
      * 按标签筛选内容ID列表
      */
-    List<Map<String, Object>> getContentIdsByTag(Long tagId, String contentType, int page, int size);
+    PageResult<Map<String, Object>> getContentIdsByTag(Long tagId, String contentType, int page, int size);
 
     /**
      * 删除内容的所有标签关联

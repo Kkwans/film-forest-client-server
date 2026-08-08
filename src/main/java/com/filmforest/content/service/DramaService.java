@@ -24,7 +24,7 @@ public interface DramaService extends IService<Drama> {
      * @return 分页结果
      */
     IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                          Integer yearFrom, Integer yearTo, String sortDir);
+                           Integer yearFrom, Integer yearTo, Long tagId, String sortDir);
 
     /**
      * 获取电视剧详情（含在线资源和播放源）

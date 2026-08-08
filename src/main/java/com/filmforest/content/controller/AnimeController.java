@@ -27,8 +27,9 @@ public class AnimeController {
             @RequestParam(required = false) String sort,
             @RequestParam(required = false) Integer yearFrom,
             @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false) Long tag,
             @RequestParam(required = false, defaultValue = "desc") String sortDir) {
-        return Result.ok(animeService.pageList(page, size, year, region, genre, sort, yearFrom, yearTo, sortDir));
+        return Result.ok(animeService.pageList(page, size, year, region, genre, sort, yearFrom, yearTo, tag, sortDir));
     }
 
     @GetMapping("/{id}")

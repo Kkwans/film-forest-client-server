@@ -2,12 +2,15 @@ package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.entity.ContentTag;
 import com.filmforest.content.entity.Tag;
 import com.filmforest.content.mapper.ContentTagMapper;
 import com.filmforest.content.mapper.TagMapper;
 import com.filmforest.content.service.TagService;
+import com.filmforest.content.dto.PageResult;
+import com.filmforest.content.model.ContentType;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -26,6 +29,15 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements TagSe
     @Override
     public List<Tag> getAllTags() {
         return list(new LambdaQueryWrapper<Tag>()
+                .orderByDesc(Tag::getUsageCount)
+                .orderByAsc(Tag::getSortOrder));
+    }
+
+    @Override
+    public IPage<Tag> pageTags(int page, int size) {
+        int safePage = Math.max(1, page);
+        int safeSize = Math.min(100, Math.max(1, size));
+        return page(new Page<>(safePage, safeSize), new LambdaQueryWrapper<Tag>()
                 .orderByDesc(Tag::getUsageCount)
                 .orderByAsc(Tag::getSortOrder));
     }
@@ -116,22 +128,26 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements TagSe
     }
 
     @Override
-    public List<Map<String, Object>> getContentIdsByTag(Long tagId, String contentType, int page, int size) {
+    public PageResult<Map<String, Object>> getContentIdsByTag(Long tagId, String contentType, int page, int size) {
         LambdaQueryWrapper<ContentTag> wrapper = new LambdaQueryWrapper<ContentTag>()
                 .eq(ContentTag::getTagId, tagId)
                 .orderByDesc(ContentTag::getCreatedAt);
         if (contentType != null && !contentType.isEmpty()) {
-            wrapper.eq(ContentTag::getContentType, contentType);
+            wrapper.eq(ContentTag::getContentType, ContentType.parse(contentType).code());
         }
+        int safePage = Math.max(1, page);
+        int safeSize = Math.min(100, Math.max(1, size));
         Page<ContentTag> pageResult = contentTagMapper.selectPage(
-                new Page<>(page, size), wrapper);
+                new Page<>(safePage, safeSize), wrapper);
 
-        return pageResult.getRecords().stream().map(ct -> {
+        List<Map<String, Object>> records = pageResult.getRecords().stream().map(ct -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("contentId", ct.getContentId());
             m.put("contentType", ct.getContentType());
             return m;
         }).collect(Collectors.toList());
+        return new PageResult<>(records, pageResult.getTotal(), pageResult.getSize(),
+                pageResult.getCurrent(), pageResult.getPages());
     }
 
     @Override

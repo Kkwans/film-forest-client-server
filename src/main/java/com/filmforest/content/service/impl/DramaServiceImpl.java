@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.entity.Drama;
 import com.filmforest.content.mapper.DramaMapper;
 import com.filmforest.content.service.DramaService;
+import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.model.ContentType;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +18,15 @@ import org.springframework.stereotype.Service;
  */
 public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements DramaService {
 
+    private final ContentTagLookupService contentTagLookupService;
+
+    public DramaServiceImpl(ContentTagLookupService contentTagLookupService) {
+        this.contentTagLookupService = contentTagLookupService;
+    }
+
     @Override
     public IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                  Integer yearFrom, Integer yearTo, String sortDir) {
+                                  Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<>();
 
         if (year != null) {
@@ -30,6 +38,7 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
 
         wrapper.like(StringUtils.isNotBlank(region), Drama::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Drama::getGenre, genre);
+        contentTagLookupService.apply(wrapper, Drama::getId, tagId, ContentType.DRAMA);
 
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
         if ("douban".equals(sort)) {
