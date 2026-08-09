@@ -50,17 +50,15 @@ class UserMovieListPagingTest {
 
     @Test
     void appliesContentTypeBeforeDatabasePagination() {
-        Page<UserMovieListItem> emptyPage = new Page<>(1, 20);
-        emptyPage.setRecords(List.of());
-        emptyPage.setTotal(0);
-        when(itemMapper.selectPage(any(Page.class), any(Wrapper.class))).thenReturn(emptyPage);
+        when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
 
         service.getListItems(42L, 9L, 1, 20, "addedAt", "desc", "movie");
 
         ArgumentCaptor<LambdaQueryWrapper<UserMovieListItem>> wrapper = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-        verify(itemMapper).selectPage(any(Page.class), wrapper.capture());
+        verify(itemMapper).selectList(wrapper.capture());
         wrapper.getValue().getSqlSegment();
         assertThat(wrapper.getValue().getParamNameValuePairs().values()).contains(9L, "movie");
+        verify(itemMapper, never()).selectPage(any(Page.class), any(Wrapper.class));
     }
 
     @Test

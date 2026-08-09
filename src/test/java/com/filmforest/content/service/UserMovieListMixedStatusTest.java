@@ -6,6 +6,10 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.filmforest.content.dto.ContentStatusQuery;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.entity.UserMovieListItem;
+import com.filmforest.content.entity.Movie;
+import com.filmforest.content.entity.ShortDrama;
+import com.filmforest.content.mapper.MovieMapper;
+import com.filmforest.content.mapper.ShortDramaMapper;
 import com.filmforest.content.mapper.UserMovieListItemMapper;
 import com.filmforest.content.mapper.UserMovieListMapper;
 import com.filmforest.content.service.impl.UserMovieListServiceImpl;
@@ -27,6 +31,8 @@ class UserMovieListMixedStatusTest {
 
     @Mock private UserMovieListMapper listMapper;
     @Mock private UserMovieListItemMapper itemMapper;
+    @Mock private MovieMapper movieMapper;
+    @Mock private ShortDramaMapper shortDramaMapper;
     private UserMovieListServiceImpl service;
 
     @BeforeEach
@@ -35,9 +41,17 @@ class UserMovieListMixedStatusTest {
         TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-test"),
                 UserMovieListItem.class);
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-movie-test"),
+                Movie.class);
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-short-test"),
+                ShortDrama.class);
         service = new UserMovieListServiceImpl();
         ReflectionTestUtils.setField(service, "baseMapper", listMapper);
         ReflectionTestUtils.setField(service, "itemMapper", itemMapper);
+        ReflectionTestUtils.setField(service, "movieMapper", movieMapper);
+        ReflectionTestUtils.setField(service, "shortDramaMapper", shortDramaMapper);
     }
 
     @Test
@@ -55,6 +69,14 @@ class UserMovieListMixedStatusTest {
 
         when(listMapper.selectList(any(Wrapper.class))).thenReturn(List.of(watched));
         when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(movieItem));
+        Movie publishedMovie = new Movie();
+        publishedMovie.setId(7L);
+        when(movieMapper.selectList(org.mockito.ArgumentMatchers.<Wrapper<Movie>>any()))
+                .thenReturn(List.of(publishedMovie));
+        ShortDrama publishedShortDrama = new ShortDrama();
+        publishedShortDrama.setId(7L);
+        when(shortDramaMapper.selectList(org.mockito.ArgumentMatchers.<Wrapper<ShortDrama>>any()))
+                .thenReturn(List.of(publishedShortDrama));
 
         var result = service.getContentStatusBatch(42L, List.of(
                 new ContentStatusQuery("movie", 7L),

@@ -1,7 +1,6 @@
 package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
@@ -11,7 +10,9 @@ import com.filmforest.content.dto.ContentStatusResult;
 import com.filmforest.content.entity.*;
 import com.filmforest.content.mapper.*;
 import com.filmforest.content.service.UserMovieListService;
+import com.filmforest.content.service.PublishedContentAccessService;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.model.ContentStatus;
 import com.filmforest.common.exception.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -44,6 +45,9 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     @Autowired
     private ShortDramaMapper shortDramaMapper;
 
+    @Autowired
+    private PublishedContentAccessService publishedContentAccessService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void createDefaultLists(Long userId) {
@@ -70,22 +74,13 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 .orderByAsc(UserMovieList::getIsDefault)
                 .orderByDesc(UserMovieList::getCreatedAt));
 
-        // 填充每个片单的 item_count
+        // 仅统计仍处于已上线状态的内容；草稿/下线内容不得通过数量侧信道暴露。
         if (!lists.isEmpty()) {
             List<Long> listIds = lists.stream().map(UserMovieList::getId).collect(Collectors.toList());
-            // 批量查询每个片单的条目数量
-            List<Map<String, Object>> counts = itemMapper.selectMaps(
-                    new QueryWrapper<UserMovieListItem>()
-                            .select("list_id as listId", "count(*) as cnt")
-                            .in("list_id", listIds)
-                            .groupBy("list_id")
-            );
-            Map<Long, Integer> countMap = new HashMap<>();
-            for (Map<String, Object> row : counts) {
-                Long listId = ((Number) row.get("listId")).longValue();
-                int cnt = ((Number) row.get("cnt")).intValue();
-                countMap.put(listId, cnt);
-            }
+            List<UserMovieListItem> items = itemMapper.selectList(new LambdaQueryWrapper<UserMovieListItem>()
+                    .in(UserMovieListItem::getListId, listIds));
+            Map<Long, Integer> countMap = enrichItems(items).stream()
+                    .collect(Collectors.groupingBy(UserListItemVO::getListId, Collectors.summingInt(ignored -> 1)));
             for (UserMovieList list : lists) {
                 list.setItemCount(countMap.getOrDefault(list.getId(), 0));
             }
@@ -96,11 +91,13 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
     @Override
     public UserMovieList createList(Long userId, String name, String description) {
+        String normalizedName = validateListName(name);
+        String normalizedDescription = validateDescription(description);
         UserMovieList list = new UserMovieList();
         list.setUserId(userId);
-        list.setName(name);
+        list.setName(normalizedName);
         list.setType("custom");
-        list.setDescription(description);
+        list.setDescription(normalizedDescription);
         list.setIsDefault(0);
         list.setItemCount(0);
         save(list);
@@ -113,11 +110,14 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         if (list == null || !list.getUserId().equals(userId)) {
             throw new RuntimeException("片单不存在");
         }
+        if (list.getIsDefault() != null && list.getIsDefault() == 1) {
+            throw new RuntimeException("默认片单不可编辑");
+        }
         if (name != null) {
-            list.setName(name);
+            list.setName(validateListName(name));
         }
         if (description != null) {
-            list.setDescription(description);
+            list.setDescription(validateDescription(description));
         }
         updateById(list);
     }
@@ -149,14 +149,20 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         if (list == null || !list.getUserId().equals(userId)) {
             throw new RuntimeException("片单不存在");
         }
+        ContentType normalizedType = ContentType.parse(contentType);
+        if (!publishedContentAccessService.isPublished(normalizedType.code(), movieId)) {
+            throw new BusinessException("内容不存在或尚未上线");
+        }
+        validateRating(list, rating);
+        String normalizedNote = validateNote(note);
 
         // 先尝试直接插入，利用 UNIQUE 约束 (list_id, movie_id, content_type) 防止并发重复
         UserMovieListItem item = new UserMovieListItem();
         item.setListId(listId);
         item.setMovieId(movieId);
-        item.setContentType(contentType);
+        item.setContentType(normalizedType.code());
         item.setRating(rating);
-        item.setNote(note);
+        item.setNote(normalizedNote);
 
         try {
             itemMapper.insert(item);
@@ -165,10 +171,10 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             UserMovieListItem existing = itemMapper.selectOne(new LambdaQueryWrapper<UserMovieListItem>()
                     .eq(UserMovieListItem::getListId, listId)
                     .eq(UserMovieListItem::getMovieId, movieId)
-                    .eq(UserMovieListItem::getContentType, contentType));
+                    .eq(UserMovieListItem::getContentType, normalizedType.code()));
             if (existing != null) {
                 if (rating != null) existing.setRating(rating);
-                if (note != null) existing.setNote(note);
+                if (note != null) existing.setNote(normalizedNote);
                 itemMapper.updateById(existing);
             }
             // 注意：不在此处 return，继续执行互斥逻辑
@@ -186,7 +192,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
                         .eq(UserMovieListItem::getListId, wantList.getId())
                         .eq(UserMovieListItem::getMovieId, movieId)
-                        .eq(UserMovieListItem::getContentType, contentType));
+                        .eq(UserMovieListItem::getContentType, normalizedType.code()));
             }
         }
         if ("watched".equals(list.getType())) {
@@ -198,7 +204,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
                         .eq(UserMovieListItem::getListId, watchingList.getId())
                         .eq(UserMovieListItem::getMovieId, movieId)
-                        .eq(UserMovieListItem::getContentType, contentType));
+                        .eq(UserMovieListItem::getContentType, normalizedType.code()));
             }
         }
     }
@@ -215,7 +221,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId)
                 .eq(UserMovieListItem::getMovieId, movieId)
-                .eq(UserMovieListItem::getContentType, contentType));
+                .eq(UserMovieListItem::getContentType, ContentType.parse(contentType).code()));
     }
 
     @Override
@@ -234,28 +240,21 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             baseQuery.eq(UserMovieListItem::getContentType, contentType);
         }
 
-        // 对于 item 表字段的排序（addedAt, userRating），直接在 SQL 层排序
-        if ("addedAt".equals(sort) || "userRating".equals(sort)) {
-            Page<UserMovieListItem> page = new Page<>(pageNum, pageSize);
-            if ("addedAt".equals(sort)) {
-                baseQuery = desc ? baseQuery.orderByDesc(UserMovieListItem::getAddedAt) : baseQuery.orderByAsc(UserMovieListItem::getAddedAt);
-            } else {
-                baseQuery = desc ? baseQuery.orderByDesc(UserMovieListItem::getRating) : baseQuery.orderByAsc(UserMovieListItem::getRating);
-            }
-            IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, baseQuery);
-            Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
-            voPage.setTotal(itemPage.getTotal());
-            voPage.setRecords(enrichItems(itemPage.getRecords()));
-            return voPage;
-        }
-
-        // 内容表字段不在关联表中：先对完整筛选结果补全并排序，再执行内存分页，保证跨页顺序正确。
+        // 先过滤未上线内容，再对完整可见集合排序和分页，避免总数、页数或条目泄露草稿/下线内容。
         List<UserListItemVO> voList = enrichItems(itemMapper.selectList(baseQuery));
 
         // 在 VO 层排序
         voList.sort((a, b) -> {
             int cmp = 0;
             switch (sort) {
+                case "addedAt":
+                    cmp = Comparator.nullsFirst(Comparator.<java.time.LocalDateTime>naturalOrder())
+                            .compare(a.getAddedAt(), b.getAddedAt());
+                    break;
+                case "userRating":
+                    cmp = Comparator.nullsFirst(Comparator.<BigDecimal>naturalOrder())
+                            .compare(a.getUserRating(), b.getUserRating());
+                    break;
                 case "year":
                     int ya = a.getYear() != null ? a.getYear() : 0;
                     int yb = b.getYear() != null ? b.getYear() : 0;
@@ -267,7 +266,8 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                     cmp = Double.compare(da, db);
                     break;
                 default:
-                    cmp = 0;
+                    cmp = Comparator.nullsFirst(Comparator.<java.time.LocalDateTime>naturalOrder())
+                            .compare(a.getAddedAt(), b.getAddedAt());
             }
             return desc ? -cmp : cmp;
         });
@@ -304,34 +304,47 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
         if (idsByType.containsKey("movie")) {
             List<Long> ids = idsByType.get("movie");
-            movieMap = movieMapper.selectBatchIds(ids).stream()
+            movieMap = movieMapper.selectList(new LambdaQueryWrapper<Movie>()
+                            .in(Movie::getId, ids)
+                            .eq(Movie::getStatus, ContentStatus.PUBLISHED.code())).stream()
                     .collect(Collectors.toMap(Movie::getId, Function.identity(), (a, b) -> a));
         }
         if (idsByType.containsKey("drama")) {
             List<Long> ids = idsByType.get("drama");
-            dramaMap = dramaMapper.selectBatchIds(ids).stream()
+            dramaMap = dramaMapper.selectList(new LambdaQueryWrapper<Drama>()
+                            .in(Drama::getId, ids)
+                            .eq(Drama::getStatus, ContentStatus.PUBLISHED.code())).stream()
                     .collect(Collectors.toMap(Drama::getId, Function.identity(), (a, b) -> a));
         }
         if (idsByType.containsKey("variety")) {
             List<Long> ids = idsByType.get("variety");
-            varietyMap = varietyMapper.selectBatchIds(ids).stream()
+            varietyMap = varietyMapper.selectList(new LambdaQueryWrapper<Variety>()
+                            .in(Variety::getId, ids)
+                            .eq(Variety::getStatus, ContentStatus.PUBLISHED.code())).stream()
                     .collect(Collectors.toMap(Variety::getId, Function.identity(), (a, b) -> a));
         }
         if (idsByType.containsKey("anime")) {
             List<Long> ids = idsByType.get("anime");
-            animeMap = animeMapper.selectBatchIds(ids).stream()
+            animeMap = animeMapper.selectList(new LambdaQueryWrapper<Anime>()
+                            .in(Anime::getId, ids)
+                            .eq(Anime::getStatus, ContentStatus.PUBLISHED.code())).stream()
                     .collect(Collectors.toMap(Anime::getId, Function.identity(), (a, b) -> a));
         }
         if (idsByType.containsKey("short_drama")) {
             List<Long> ids = idsByType.get("short_drama");
-            shortDramaMap = shortDramaMapper.selectBatchIds(ids).stream()
+            shortDramaMap = shortDramaMapper.selectList(new LambdaQueryWrapper<ShortDrama>()
+                            .in(ShortDrama::getId, ids)
+                            .eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code())).stream()
                     .collect(Collectors.toMap(ShortDrama::getId, Function.identity(), (a, b) -> a));
         }
 
         // 组装 VO
         List<UserListItemVO> result = new ArrayList<>(items.size());
         for (UserMovieListItem item : items) {
-            result.add(enrichItem(item, movieMap, dramaMap, varietyMap, animeMap, shortDramaMap));
+            UserListItemVO visibleItem = enrichItem(item, movieMap, dramaMap, varietyMap, animeMap, shortDramaMap);
+            if (visibleItem != null) {
+                result.add(visibleItem);
+            }
         }
         return result;
     }
@@ -356,6 +369,17 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
         String ct = item.getContentType();
         Long movieId = item.getMovieId();
+        boolean published = switch (ct) {
+            case "movie" -> movieMap.containsKey(movieId);
+            case "drama" -> dramaMap.containsKey(movieId);
+            case "variety" -> varietyMap.containsKey(movieId);
+            case "anime" -> animeMap.containsKey(movieId);
+            case "short_drama" -> shortDramaMap.containsKey(movieId);
+            default -> false;
+        };
+        if (!published) {
+            return null;
+        }
 
         if ("movie".equals(ct)) {
             Movie m = movieMap.get(movieId);
@@ -415,8 +439,12 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 vo.setTitle(s.getTitle());
                 vo.setCover(s.getPosterUrl());
                 vo.setYear(s.getYear());
+                vo.setRating(s.getScoreDouban());
                 vo.setRegion(s.getRegion());
                 vo.setGenre(s.getGenre());
+                vo.setDirector(s.getDirector());
+                vo.setActor(s.getActor());
+                vo.setDuration(s.getDuration());
                 vo.setTotalEpisode(s.getTotalEpisode());
             }
         }
@@ -432,22 +460,32 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         if (list == null || !list.getUserId().equals(userId)) {
             throw new RuntimeException("片单不存在");
         }
+        ContentType normalizedType = ContentType.parse(contentType);
+        if (!publishedContentAccessService.isPublished(normalizedType.code(), movieId)) {
+            throw new BusinessException("内容不存在或尚未上线");
+        }
+        validateRating(list, rating);
+        String normalizedNote = validateNote(note);
 
         UserMovieListItem existing = itemMapper.selectOne(new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId)
                 .eq(UserMovieListItem::getMovieId, movieId)
-                .eq(UserMovieListItem::getContentType, contentType));
+                .eq(UserMovieListItem::getContentType, normalizedType.code()));
         if (existing == null) {
             throw new RuntimeException("条目不存在");
         }
         if (rating != null) existing.setRating(rating);
-        if (note != null) existing.setNote(note);
+        if (note != null) existing.setNote(normalizedNote);
         itemMapper.updateById(existing);
     }
 
     @Override
     public List<Map<String, Object>> getMovieStatus(Long userId, Long movieId, String contentType) {
-        return getMovieStatusInternal(userId, movieId, contentType, null);
+        ContentType normalizedType = ContentType.parse(contentType);
+        if (!publishedContentAccessService.isPublished(normalizedType.code(), movieId)) {
+            return Collections.emptyList();
+        }
+        return getMovieStatusInternal(userId, movieId, normalizedType.code(), null);
     }
 
     /**
@@ -512,10 +550,11 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             Long movieId = item.get("movieId") != null ? Long.valueOf(item.get("movieId").toString()) : null;
             String contentType = (String) item.get("contentType");
             if (movieId != null && contentType != null && !contentType.isBlank()) {
+                String normalizedType = ContentType.parse(contentType).code();
                 itemMapper.delete(new LambdaQueryWrapper<UserMovieListItem>()
                         .eq(UserMovieListItem::getListId, listId)
                         .eq(UserMovieListItem::getMovieId, movieId)
-                        .eq(UserMovieListItem::getContentType, contentType));
+                        .eq(UserMovieListItem::getContentType, normalizedType));
             }
         }
     }
@@ -567,9 +606,10 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 .in(UserMovieListItem::getListId, listIds)
                 .in(UserMovieListItem::getMovieId, contentIds)
                 .in(UserMovieListItem::getContentType, contentTypes));
+        Set<ContentKey> publishedKeys = findPublishedKeys(normalizedQueries.keySet());
 
         Map<ContentKey, Map<Long, UserMovieListItem>> itemsByContent = items.stream()
-                .filter(item -> normalizedQueries.containsKey(new ContentKey(item.getContentType(), item.getMovieId())))
+                .filter(item -> publishedKeys.contains(new ContentKey(item.getContentType(), item.getMovieId())))
                 .collect(Collectors.groupingBy(
                         item -> new ContentKey(item.getContentType(), item.getMovieId()),
                         Collectors.toMap(UserMovieListItem::getListId, Function.identity(), (a, b) -> a)));
@@ -578,8 +618,47 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 .map(key -> new ContentStatusResult(
                         key.contentType(),
                         key.contentId(),
-                        buildStatuses(lists, itemsByContent.getOrDefault(key, Collections.emptyMap()))))
+                        publishedKeys.contains(key)
+                                ? buildStatuses(lists, itemsByContent.getOrDefault(key, Collections.emptyMap()))
+                                : Collections.emptyList()))
                 .toList();
+    }
+
+    private Set<ContentKey> findPublishedKeys(Collection<ContentKey> keys) {
+        Set<ContentKey> published = new HashSet<>();
+        Map<String, Set<Long>> idsByType = keys.stream().collect(Collectors.groupingBy(
+                ContentKey::contentType,
+                Collectors.mapping(ContentKey::contentId, Collectors.toSet())));
+        Set<Long> movieIds = idsByType.getOrDefault(ContentType.MOVIE.code(), Set.of());
+        if (!movieIds.isEmpty()) addPublishedKeys(published, ContentType.MOVIE,
+                movieMapper.selectList(new LambdaQueryWrapper<Movie>().select(Movie::getId)
+                        .in(Movie::getId, movieIds).eq(Movie::getStatus, ContentStatus.PUBLISHED.code()))
+                        .stream().map(Movie::getId).toList());
+        Set<Long> dramaIds = idsByType.getOrDefault(ContentType.DRAMA.code(), Set.of());
+        if (!dramaIds.isEmpty()) addPublishedKeys(published, ContentType.DRAMA,
+                dramaMapper.selectList(new LambdaQueryWrapper<Drama>().select(Drama::getId)
+                        .in(Drama::getId, dramaIds).eq(Drama::getStatus, ContentStatus.PUBLISHED.code()))
+                        .stream().map(Drama::getId).toList());
+        Set<Long> varietyIds = idsByType.getOrDefault(ContentType.VARIETY.code(), Set.of());
+        if (!varietyIds.isEmpty()) addPublishedKeys(published, ContentType.VARIETY,
+                varietyMapper.selectList(new LambdaQueryWrapper<Variety>().select(Variety::getId)
+                        .in(Variety::getId, varietyIds).eq(Variety::getStatus, ContentStatus.PUBLISHED.code()))
+                        .stream().map(Variety::getId).toList());
+        Set<Long> animeIds = idsByType.getOrDefault(ContentType.ANIME.code(), Set.of());
+        if (!animeIds.isEmpty()) addPublishedKeys(published, ContentType.ANIME,
+                animeMapper.selectList(new LambdaQueryWrapper<Anime>().select(Anime::getId)
+                        .in(Anime::getId, animeIds).eq(Anime::getStatus, ContentStatus.PUBLISHED.code()))
+                        .stream().map(Anime::getId).toList());
+        Set<Long> shortDramaIds = idsByType.getOrDefault(ContentType.SHORT_DRAMA.code(), Set.of());
+        if (!shortDramaIds.isEmpty()) addPublishedKeys(published, ContentType.SHORT_DRAMA,
+                shortDramaMapper.selectList(new LambdaQueryWrapper<ShortDrama>().select(ShortDrama::getId)
+                        .in(ShortDrama::getId, shortDramaIds).eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code()))
+                        .stream().map(ShortDrama::getId).toList());
+        return published;
+    }
+
+    private void addPublishedKeys(Set<ContentKey> target, ContentType type, List<Long> ids) {
+        ids.forEach(id -> target.add(new ContentKey(type.code(), id)));
     }
 
     private List<Map<String, Object>> buildStatuses(
@@ -598,6 +677,47 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             }
             return status;
         }).toList();
+    }
+
+    private String validateListName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new BusinessException("片单名称不能为空");
+        }
+        String normalized = name.trim();
+        if (normalized.length() > 100) {
+            throw new BusinessException("片单名称不能超过 100 个字符");
+        }
+        return normalized;
+    }
+
+    private String validateDescription(String description) {
+        if (description == null) return null;
+        String normalized = description.trim();
+        if (normalized.length() > 500) {
+            throw new BusinessException("片单描述不能超过 500 个字符");
+        }
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String validateNote(String note) {
+        if (note == null) return null;
+        String normalized = note.trim();
+        if (normalized.length() > 500) {
+            throw new BusinessException("备注不能超过 500 个字符");
+        }
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private void validateRating(UserMovieList list, BigDecimal rating) {
+        if (rating == null) return;
+        if (!"watched".equals(list.getType())) {
+            throw new BusinessException("只有看过的内容可以评分");
+        }
+        if (rating.compareTo(BigDecimal.ONE) < 0
+                || rating.compareTo(BigDecimal.TEN) > 0
+                || rating.remainder(new BigDecimal("0.5")).compareTo(BigDecimal.ZERO) != 0) {
+            throw new BusinessException("评分必须介于 1 和 10 之间，步长为 0.5");
+        }
     }
 
     private record ContentKey(String contentType, Long contentId) {
