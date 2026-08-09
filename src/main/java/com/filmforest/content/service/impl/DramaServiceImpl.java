@@ -57,6 +57,7 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
         } else {
             wrapper.orderBy(true, isAsc, Drama::getUpdatedAt);
         }
+        wrapper.orderBy(true, isAsc, Drama::getId);
 
         return page(new Page<>(pageNum, pageSize), wrapper);
     }

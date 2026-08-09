@@ -58,6 +58,7 @@ public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> impl
         } else {
             wrapper.orderBy(true, isAsc, Variety::getUpdatedAt);
         }
+        wrapper.orderBy(true, isAsc, Variety::getId);
 
         return page(page, wrapper);
     }

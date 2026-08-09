@@ -64,6 +64,7 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
             // 默认按更新时间（最新更新）
             wrapper.orderBy(true, isAsc, Movie::getUpdatedAt);
         }
+        wrapper.orderBy(true, isAsc, Movie::getId);
 
         return page(page, wrapper);
     }

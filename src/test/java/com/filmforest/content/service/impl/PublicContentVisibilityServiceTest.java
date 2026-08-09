@@ -123,7 +123,8 @@ class PublicContentVisibilityServiceTest {
 
         ArgumentCaptor<Wrapper<T>> wrapper = (ArgumentCaptor) ArgumentCaptor.forClass(Wrapper.class);
         verify(mapper).selectPage(any(IPage.class), wrapper.capture());
-        assertThat(wrapper.getValue().getSqlSegment()).contains("status");
+        assertThat(wrapper.getValue().getSqlSegment())
+                .contains("status", "ORDER BY", "updated_at", "id");
         assertThat(((AbstractWrapper<?, ?, ?>) wrapper.getValue()).getParamNameValuePairs())
                 .containsValue(ContentStatus.PUBLISHED.code());
     }

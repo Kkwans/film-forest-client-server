@@ -58,6 +58,7 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
         } else {
             wrapper.orderBy(true, isAsc, Anime::getUpdatedAt);
         }
+        wrapper.orderBy(true, isAsc, Anime::getId);
 
         return page(page, wrapper);
     }

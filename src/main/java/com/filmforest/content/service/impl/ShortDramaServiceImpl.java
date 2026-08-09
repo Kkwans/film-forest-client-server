@@ -54,6 +54,7 @@ public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDr
         } else {
             wrapper.orderBy(true, isAsc, ShortDrama::getUpdatedAt);
         }
+        wrapper.orderBy(true, isAsc, ShortDrama::getId);
 
         return page(page, wrapper);
     }
