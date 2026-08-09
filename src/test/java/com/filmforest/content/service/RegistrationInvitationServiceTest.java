@@ -3,6 +3,7 @@ package com.filmforest.content.service;
 import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.entity.User;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -28,6 +29,18 @@ class RegistrationInvitationServiceTest {
     private static final Clock FIXED_CLOCK = Clock.fixed(
             Instant.parse("2026-08-10T01:00:00Z"), ZoneId.of("Asia/Shanghai"));
     private static final String TOKEN = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
+
+    @Test
+    void springContextUsesTheProductionConstructor() {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.registerBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class));
+            context.registerBean(UserService.class, () -> mock(UserService.class));
+            context.register(RegistrationInvitationService.class);
+            context.refresh();
+
+            assertThat(context.getBean(RegistrationInvitationService.class)).isNotNull();
+        }
+    }
 
     @Test
     void rejectsMalformedTokenWithoutDatabaseLookup() {

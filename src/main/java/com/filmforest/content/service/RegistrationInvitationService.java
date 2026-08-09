@@ -2,6 +2,7 @@ package com.filmforest.content.service;
 
 import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.entity.User;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ public class RegistrationInvitationService {
     private final UserService userService;
     private final Clock clock;
 
+    @Autowired
     public RegistrationInvitationService(JdbcTemplate jdbcTemplate, UserService userService) {
         this(jdbcTemplate, userService, Clock.systemDefaultZone());
     }
