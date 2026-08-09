@@ -86,4 +86,25 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public User findByUsername(String username) {
         return getOne(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
     }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePassword(Long userId, String currentPassword, String newPassword) {
+        User user = getById(userId);
+        if (user == null || !Integer.valueOf(1).equals(user.getStatus())) {
+            throw new BusinessException("用户不存在或账号已禁用");
+        }
+        PasswordService.Verification verification = passwordService.verify(
+                currentPassword, user.getPasswordHash(), user.getPasswordAlgorithm());
+        if (!verification.matches()) {
+            throw new BusinessException("当前密码不正确");
+        }
+        if (currentPassword.equals(newPassword)) {
+            throw new BusinessException("新密码不能与当前密码相同");
+        }
+        user.setPasswordHash(passwordService.encode(newPassword));
+        user.setPasswordAlgorithm(PasswordAlgorithm.BCRYPT);
+        user.setMustChangePassword(false);
+        updateById(user);
+    }
 }

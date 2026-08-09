@@ -22,6 +22,9 @@ public interface UserService extends IService<User> {
      */
     User login(String username, String password);
 
+    /** 修改当前账号密码并解除首次登录限制。 */
+    void changePassword(Long userId, String currentPassword, String newPassword);
+
     /**
      * 根据用户名查找用户
      */

@@ -86,6 +86,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         request.setAttribute("username", user.getUsername());
         request.setAttribute("role", user.getRole());
 
+        if (Boolean.TRUE.equals(user.getMustChangePassword()) && !isPasswordSetupRequest(request)) {
+            writeError(response, 428, "首次登录必须先修改密码");
+            return;
+        }
+
         filterChain.doFilter(request, response);
     }
 
@@ -94,7 +99,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (HttpMethod.OPTIONS.matches(request.getMethod())) {
             return true;
         }
-        if (path.equals("/api/auth/login") || path.equals("/api/health")) {
+        if ((path.equals("/api/auth/login")
+                || path.equals("/api/auth/invitations/validate")
+                || path.equals("/api/auth/register-by-invitation"))
+                && HttpMethod.POST.matches(request.getMethod())) {
+            return true;
+        }
+        if (path.equals("/api/health") && HttpMethod.GET.matches(request.getMethod())) {
             return true;
         }
         if (!HttpMethod.GET.matches(request.getMethod())) {
@@ -105,6 +116,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         return PUBLIC_READ_PREFIXES.stream()
                 .anyMatch(prefix -> path.equals(prefix) || path.startsWith(prefix + "/"));
+    }
+
+    private boolean isPasswordSetupRequest(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        return path.equals("/api/auth/me")
+                || (path.equals("/api/auth/change-password")
+                    && HttpMethod.POST.matches(request.getMethod()));
     }
 
     private void writeError(HttpServletResponse response, int code, String message) throws IOException {

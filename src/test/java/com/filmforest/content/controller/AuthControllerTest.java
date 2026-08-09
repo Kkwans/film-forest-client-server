@@ -4,6 +4,7 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.common.exception.BusinessException;
 import com.filmforest.content.dto.LoginRequest;
 import com.filmforest.content.service.LoginAttemptService;
+import com.filmforest.content.service.RegistrationInvitationService;
 import com.filmforest.content.service.UserService;
 import com.filmforest.content.util.JwtUtil;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,8 @@ class AuthControllerTest {
     private final UserService userService = mock(UserService.class);
     private final JwtUtil jwtUtil = mock(JwtUtil.class);
     private final LoginAttemptService attempts = mock(LoginAttemptService.class);
-    private final AuthController controller = new AuthController(userService, jwtUtil, attempts);
+    private final RegistrationInvitationService invitations = mock(RegistrationInvitationService.class);
+    private final AuthController controller = new AuthController(userService, jwtUtil, attempts, invitations);
 
     @Test
     void rejectsBlockedLoginBeforePasswordVerification() {

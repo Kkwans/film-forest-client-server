@@ -38,6 +38,9 @@ class JwtAuthenticationFilterTest {
         assertThat(isPublic("GET", "/api/recommend/personalized")).isFalse();
         assertThat(isPublic("GET", "/api/auth/me")).isFalse();
         assertThat(isPublic("POST", "/api/auth/register")).isFalse();
+        assertThat(isPublic("GET", "/api/auth/invitations/validate")).isFalse();
+        assertThat(isPublic("POST", "/api/auth/invitations/validate")).isTrue();
+        assertThat(isPublic("POST", "/api/auth/register-by-invitation")).isTrue();
     }
 
     @Test
@@ -72,15 +75,64 @@ class JwtAuthenticationFilterTest {
         verify(chain, never()).doFilter(request, response);
     }
 
+    @Test
+    void requiresTemporaryPasswordChangeBeforeOtherProtectedRequests() throws Exception {
+        Claims claims = mock(Claims.class);
+        when(jwtUtil.parseToken("valid-token")).thenReturn(claims);
+        when(claims.getSubject()).thenReturn("7");
+        User user = user(1, 0);
+        user.setMustChangePassword(true);
+        when(userService.getById(7L)).thenReturn(user);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/user/lists");
+        request.addHeader("Authorization", "Bearer valid-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(428);
+        verify(chain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void allowsTemporaryAccountToReadProfileAndChangePassword() throws Exception {
+        Claims claims = mock(Claims.class);
+        when(jwtUtil.parseToken("valid-token")).thenReturn(claims);
+        when(claims.getSubject()).thenReturn("7");
+        User user = user(1, 0);
+        user.setMustChangePassword(true);
+        when(userService.getById(7L)).thenReturn(user);
+        FilterChain chain = mock(FilterChain.class);
+
+        for (MockHttpServletRequest request : java.util.List.of(
+                authenticatedRequest(), authenticatedRequest("POST", "/api/auth/change-password"))) {
+            filter.doFilterInternal(request, new MockHttpServletResponse(), chain);
+        }
+
+        verify(chain, org.mockito.Mockito.times(2)).doFilter(anyRequest(), anyResponse());
+    }
+
     private boolean isPublic(String method, String path) {
         MockHttpServletRequest request = new MockHttpServletRequest(method, path);
         return filter.isPublicRequest(request);
     }
 
     private MockHttpServletRequest authenticatedRequest() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/auth/me");
+        return authenticatedRequest("GET", "/api/auth/me");
+    }
+
+    private MockHttpServletRequest authenticatedRequest(String method, String path) {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
         request.addHeader("Authorization", "Bearer valid-token");
         return request;
+    }
+
+    private jakarta.servlet.ServletRequest anyRequest() {
+        return org.mockito.ArgumentMatchers.any(jakarta.servlet.ServletRequest.class);
+    }
+
+    private jakarta.servlet.ServletResponse anyResponse() {
+        return org.mockito.ArgumentMatchers.any(jakarta.servlet.ServletResponse.class);
     }
 
     private User user(int status, int deleted) {
