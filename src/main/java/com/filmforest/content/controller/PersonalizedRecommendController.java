@@ -26,6 +26,7 @@ public class PersonalizedRecommendController {
      * @param genres    用户偏好的类型，逗号分隔（如 "动作,科幻,悬疑"）
      * @param region    用户偏好的地区（可选）
      * @param excludeIds 已看过的内容 ID，逗号分隔（可选，用于去重）
+     * @param excludeKeys 类型化排除键，逗号分隔（如 movie:1,drama:1）
      * @param limit     返回数量，默认 12
      * @return 推荐列表（跨类型混合，按评分降序）
      */
@@ -34,9 +35,11 @@ public class PersonalizedRecommendController {
             @RequestParam(required = false) String genres,
             @RequestParam(required = false) String region,
             @RequestParam(required = false) String excludeIds,
+            @RequestParam(required = false) String excludeKeys,
             @RequestParam(defaultValue = "12") int limit) {
-        log.info("[PersonalizedRecommend] genres={}, region={}, excludeIds={}, limit={}", genres, region, excludeIds, limit);
-        List<Map<String, Object>> data = personalizedRecommendService.getPersonalized(genres, region, excludeIds, limit);
+        log.info("[PersonalizedRecommend] genres={}, region={}, excludeKeys={}, limit={}", genres, region, excludeKeys, limit);
+        List<Map<String, Object>> data = personalizedRecommendService.getPersonalized(
+                genres, region, excludeIds, excludeKeys, limit);
         return Result.ok(data);
     }
 }

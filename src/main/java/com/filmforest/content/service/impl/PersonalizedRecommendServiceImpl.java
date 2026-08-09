@@ -2,6 +2,7 @@ package com.filmforest.content.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.filmforest.content.entity.*;
+import com.filmforest.content.model.ContentType;
 import com.filmforest.content.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -30,20 +31,22 @@ public class PersonalizedRecommendServiceImpl implements PersonalizedRecommendSe
     @Autowired private ShortDramaService shortDramaService;
 
     @Override
-    public List<Map<String, Object>> getPersonalized(String genres, String region, String excludeIds, int limit) {
+    public List<Map<String, Object>> getPersonalized(String genres, String region, String excludeIds,
+                                                      String excludeKeys, int limit) {
         if (limit <= 0) limit = 12;
         if (limit > 30) limit = 30;
 
-        Set<Long> excludeIdSet = parseIds(excludeIds);
+        Map<String, Set<Long>> excludeIdsByType = parseExcludeKeys(excludeKeys);
+        Set<Long> legacyExcludeIds = parseIds(excludeIds);
         List<String> genreList = parseGenres(genres);
 
         List<Map<String, Object>> allResults = new ArrayList<>();
 
-        allResults.addAll(queryMovies(genreList, region, excludeIdSet, limit * 2));
-        allResults.addAll(queryDramas(genreList, region, excludeIdSet, limit * 2));
-        allResults.addAll(queryVarieties(genreList, region, excludeIdSet, limit * 2));
-        allResults.addAll(queryAnimes(genreList, region, excludeIdSet, limit * 2));
-        allResults.addAll(queryShortDramas(genreList, region, excludeIdSet, limit * 2));
+        allResults.addAll(queryMovies(genreList, region, exclusions(excludeIdsByType, legacyExcludeIds, "movie"), limit * 2));
+        allResults.addAll(queryDramas(genreList, region, exclusions(excludeIdsByType, legacyExcludeIds, "drama"), limit * 2));
+        allResults.addAll(queryVarieties(genreList, region, exclusions(excludeIdsByType, legacyExcludeIds, "variety"), limit * 2));
+        allResults.addAll(queryAnimes(genreList, region, exclusions(excludeIdsByType, legacyExcludeIds, "anime"), limit * 2));
+        allResults.addAll(queryShortDramas(genreList, region, exclusions(excludeIdsByType, legacyExcludeIds, "short_drama"), limit * 2));
 
         // 按评分降序
         allResults.sort((a, b) -> {
@@ -263,6 +266,29 @@ public class PersonalizedRecommendServiceImpl implements PersonalizedRecommendSe
             try { set.add(Long.parseLong(s.trim())); } catch (NumberFormatException ignored) {}
         }
         return set;
+    }
+
+    private Map<String, Set<Long>> parseExcludeKeys(String keys) {
+        Map<String, Set<Long>> result = new HashMap<>();
+        if (StringUtils.isBlank(keys)) return result;
+        for (String rawKey : keys.split(",")) {
+            String[] parts = rawKey.trim().split(":", 2);
+            if (parts.length != 2) continue;
+            try {
+                String type = ContentType.parse(parts[0]).code();
+                long id = Long.parseLong(parts[1].trim());
+                if (id > 0) result.computeIfAbsent(type, ignored -> new HashSet<>()).add(id);
+            } catch (RuntimeException ignored) {
+                // Ignore malformed client history entries without failing the recommendation request.
+            }
+        }
+        return result;
+    }
+
+    private Set<Long> exclusions(Map<String, Set<Long>> byType, Set<Long> legacyIds, String type) {
+        Set<Long> result = new HashSet<>(legacyIds);
+        result.addAll(byType.getOrDefault(type, Collections.emptySet()));
+        return result;
     }
 
     private List<String> parseGenres(String genres) {

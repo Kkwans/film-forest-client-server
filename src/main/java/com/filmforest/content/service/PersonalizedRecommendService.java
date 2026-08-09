@@ -16,5 +16,6 @@ public interface PersonalizedRecommendService {
      * @param limit      返回数量
      * @return 推荐列表（跨类型混合）
      */
-    List<Map<String, Object>> getPersonalized(String genres, String region, String excludeIds, int limit);
+    List<Map<String, Object>> getPersonalized(String genres, String region, String excludeIds,
+                                              String excludeKeys, int limit);
 }
