@@ -9,7 +9,7 @@ import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import com.filmforest.content.service.*;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -24,12 +24,26 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/search")
 public class SearchController {
 
-    @Autowired private MovieService movieService;
-    @Autowired private DramaService dramaService;
-    @Autowired private VarietyService varietyService;
-    @Autowired private AnimeService animeService;
-    @Autowired private ShortDramaService shortDramaService;
-    @Autowired private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+    private final MovieService movieService;
+    private final DramaService dramaService;
+    private final VarietyService varietyService;
+    private final AnimeService animeService;
+    private final ShortDramaService shortDramaService;
+    private final JdbcTemplate jdbcTemplate;
+
+    public SearchController(MovieService movieService,
+                            DramaService dramaService,
+                            VarietyService varietyService,
+                            AnimeService animeService,
+                            ShortDramaService shortDramaService,
+                            JdbcTemplate jdbcTemplate) {
+        this.movieService = movieService;
+        this.dramaService = dramaService;
+        this.varietyService = varietyService;
+        this.animeService = animeService;
+        this.shortDramaService = shortDramaService;
+        this.jdbcTemplate = jdbcTemplate;
+    }
 
     /**
      * 搜索建议：标题前缀匹配，返回 Top 10
@@ -132,12 +146,18 @@ public class SearchController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String typeFilter,
+            @RequestParam(required = false) Long tagId,
             @RequestParam(defaultValue = "latest") String sort,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
         if (keyword == null || keyword.trim().isEmpty()) {
             log.warn("[Search] 关键词为空");
             return Result.fail("关键词不能为空");
+        }
+        try {
+            validateTagId(tagId);
+        } catch (IllegalArgumentException invalid) {
+            return Result.fail(400, invalid.getMessage());
         }
 
         String kw = keyword.trim();
@@ -146,18 +166,29 @@ public class SearchController {
         long from = (safePage - 1L) * safeSize;
         long perTableLimit = from + safeSize;
         Set<ContentType> selectedTypes = parseTypeFilter(typeFilter);
+        Map<ContentType, Set<Long>> tagMatches = loadTagMatches(tagId, selectedTypes);
         boolean desc = "desc".equalsIgnoreCase(sortDir);
-        log.debug("[Search] keyword={}, page={}, size={}, types={}, sort={}, sortDir={}",
-                kw, safePage, safeSize, selectedTypes, sort, sortDir);
+        log.debug("[Search] keyword={}, page={}, size={}, types={}, tagId={}, sort={}, sortDir={}",
+                kw, safePage, safeSize, selectedTypes, tagId, sort, sortDir);
 
         List<SearchResult> allResults = new ArrayList<>();
 
         long total = 0;
-        if (selectedTypes.contains(ContentType.MOVIE)) total += searchMovies(kw, perTableLimit, sort, desc, allResults);
-        if (selectedTypes.contains(ContentType.DRAMA)) total += searchDramas(kw, perTableLimit, sort, desc, allResults);
-        if (selectedTypes.contains(ContentType.VARIETY)) total += searchVarieties(kw, perTableLimit, sort, desc, allResults);
-        if (selectedTypes.contains(ContentType.ANIME)) total += searchAnimes(kw, perTableLimit, sort, desc, allResults);
-        if (selectedTypes.contains(ContentType.SHORT_DRAMA)) total += searchShortDramas(kw, perTableLimit, sort, desc, allResults);
+        if (shouldSearch(ContentType.MOVIE, selectedTypes, tagId, tagMatches)) {
+            total += searchMovies(kw, perTableLimit, sort, desc, tagMatches.get(ContentType.MOVIE), allResults);
+        }
+        if (shouldSearch(ContentType.DRAMA, selectedTypes, tagId, tagMatches)) {
+            total += searchDramas(kw, perTableLimit, sort, desc, tagMatches.get(ContentType.DRAMA), allResults);
+        }
+        if (shouldSearch(ContentType.VARIETY, selectedTypes, tagId, tagMatches)) {
+            total += searchVarieties(kw, perTableLimit, sort, desc, tagMatches.get(ContentType.VARIETY), allResults);
+        }
+        if (shouldSearch(ContentType.ANIME, selectedTypes, tagId, tagMatches)) {
+            total += searchAnimes(kw, perTableLimit, sort, desc, tagMatches.get(ContentType.ANIME), allResults);
+        }
+        if (shouldSearch(ContentType.SHORT_DRAMA, selectedTypes, tagId, tagMatches)) {
+            total += searchShortDramas(kw, perTableLimit, sort, desc, tagMatches.get(ContentType.SHORT_DRAMA), allResults);
+        }
 
         Comparator<SearchResult> comparator = getSearchResultComparator(sort, desc);
         List<SearchResult> pageData = allResults.stream()
@@ -181,7 +212,8 @@ public class SearchController {
 
     // ==================== 各类型搜索方法 ====================
 
-    private long searchMovies(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
+    private long searchMovies(String kw, long limit, String sort, boolean desc,
+                              Set<Long> taggedContentIds, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<Movie>()
                     .eq(Movie::getStatus, ContentStatus.PUBLISHED.code())
@@ -189,6 +221,7 @@ public class SearchController {
                             .or().like(Movie::getAlias, kw)
                             .or().like(Movie::getActor, kw)
                             .or().like(Movie::getDirector, kw));
+            wrapper.in(taggedContentIds != null, Movie::getId, taggedContentIds);
             applyMovieSort(wrapper, sort, !desc);
             Page<Movie> p = movieService.page(new Page<>(1, limit), wrapper);
             for (Movie m : p.getRecords()) {
@@ -207,13 +240,15 @@ public class SearchController {
         }
     }
 
-    private long searchDramas(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
+    private long searchDramas(String kw, long limit, String sort, boolean desc,
+                              Set<Long> taggedContentIds, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<Drama>()
                     .eq(Drama::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Drama::getTitle, kw)
                             .or().like(Drama::getAlias, kw)
                             .or().like(Drama::getActor, kw));
+            wrapper.in(taggedContentIds != null, Drama::getId, taggedContentIds);
             applyDramaSort(wrapper, sort, !desc);
             Page<Drama> p = dramaService.page(new Page<>(1, limit), wrapper);
             for (Drama d : p.getRecords()) {
@@ -232,11 +267,13 @@ public class SearchController {
         }
     }
 
-    private long searchVarieties(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
+    private long searchVarieties(String kw, long limit, String sort, boolean desc,
+                                 Set<Long> taggedContentIds, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<Variety>()
                     .eq(Variety::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Variety::getTitle, kw).or().like(Variety::getAlias, kw));
+            wrapper.in(taggedContentIds != null, Variety::getId, taggedContentIds);
             applyVarietySort(wrapper, sort, !desc);
             Page<Variety> p = varietyService.page(new Page<>(1, limit), wrapper);
             for (Variety v : p.getRecords()) {
@@ -255,13 +292,15 @@ public class SearchController {
         }
     }
 
-    private long searchAnimes(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
+    private long searchAnimes(String kw, long limit, String sort, boolean desc,
+                              Set<Long> taggedContentIds, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<Anime>()
                     .eq(Anime::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Anime::getTitle, kw)
                             .or().like(Anime::getAlias, kw)
                             .or().like(Anime::getActor, kw));
+            wrapper.in(taggedContentIds != null, Anime::getId, taggedContentIds);
             applyAnimeSort(wrapper, sort, !desc);
             Page<Anime> p = animeService.page(new Page<>(1, limit), wrapper);
             for (Anime a : p.getRecords()) {
@@ -280,11 +319,13 @@ public class SearchController {
         }
     }
 
-    private long searchShortDramas(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
+    private long searchShortDramas(String kw, long limit, String sort, boolean desc,
+                                   Set<Long> taggedContentIds, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<ShortDrama>()
                     .eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(ShortDrama::getTitle, kw).or().like(ShortDrama::getAlias, kw));
+            wrapper.in(taggedContentIds != null, ShortDrama::getId, taggedContentIds);
             applyShortDramaSort(wrapper, sort, !desc);
             Page<ShortDrama> p = shortDramaService.page(new Page<>(1, limit), wrapper);
             for (ShortDrama s : p.getRecords()) {
@@ -315,6 +356,62 @@ public class SearchController {
                 .map(ContentType::parse)
                 .forEach(selected::add);
         return selected.isEmpty() ? EnumSet.allOf(ContentType.class) : selected;
+    }
+
+    static void validateTagId(Long tagId) {
+        if (tagId != null && tagId <= 0) {
+            throw new IllegalArgumentException("tagId 必须为正整数");
+        }
+    }
+
+    private Map<ContentType, Set<Long>> loadTagMatches(Long tagId, Set<ContentType> selectedTypes) {
+        if (tagId == null) return Map.of();
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
+                SELECT ct.content_type AS contentType, ct.content_id AS contentId
+                FROM content_tag ct
+                JOIN tag t ON t.id = ct.tag_id AND t.is_system = 1 AND t.is_deleted = 0
+                JOIN tag_content_type tct
+                  ON tct.tag_id = ct.tag_id AND tct.content_type = ct.content_type
+                WHERE ct.tag_id = ?
+                """, tagId);
+        return groupTagMatches(rows, selectedTypes);
+    }
+
+    static Map<ContentType, Set<Long>> groupTagMatches(List<Map<String, Object>> rows,
+                                                        Set<ContentType> selectedTypes) {
+        EnumMap<ContentType, Set<Long>> grouped = new EnumMap<>(ContentType.class);
+        if (rows == null || rows.isEmpty()) return grouped;
+        for (Map<String, Object> row : rows) {
+            Object rawType = valueIgnoreCase(row, "contentType");
+            Object rawId = valueIgnoreCase(row, "contentId");
+            if (rawType == null || !(rawId instanceof Number number)) continue;
+            try {
+                ContentType type = ContentType.parse(rawType.toString());
+                long contentId = number.longValue();
+                if (contentId > 0 && selectedTypes.contains(type)) {
+                    grouped.computeIfAbsent(type, ignored -> new LinkedHashSet<>()).add(contentId);
+                }
+            } catch (RuntimeException ignored) {
+                // Historical invalid content_type rows are not valid public search matches.
+            }
+        }
+        return grouped;
+    }
+
+    private static Object valueIgnoreCase(Map<String, Object> row, String key) {
+        if (row == null) return null;
+        if (row.containsKey(key)) return row.get(key);
+        return row.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(key))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean shouldSearch(ContentType type, Set<ContentType> selectedTypes, Long tagId,
+                                 Map<ContentType, Set<Long>> tagMatches) {
+        if (!selectedTypes.contains(type)) return false;
+        return tagId == null || !tagMatches.getOrDefault(type, Set.of()).isEmpty();
     }
 
     private void applyMovieSort(LambdaQueryWrapper<Movie> wrapper, String sort, boolean asc) {
