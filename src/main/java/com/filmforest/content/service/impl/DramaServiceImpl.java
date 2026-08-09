@@ -9,6 +9,7 @@ import com.filmforest.content.mapper.DramaMapper;
 import com.filmforest.content.service.DramaService;
 import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
     public IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                                   Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Drama::getStatus, ContentStatus.PUBLISHED.code());
 
         if (year != null) {
             wrapper.eq(Drama::getYear, year);
@@ -56,6 +58,8 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
 
     @Override
     public Drama getDetail(Long id) {
-        return getById(id);
+        return getOne(new LambdaQueryWrapper<Drama>()
+                .eq(Drama::getId, id)
+                .eq(Drama::getStatus, ContentStatus.PUBLISHED.code()));
     }
 }

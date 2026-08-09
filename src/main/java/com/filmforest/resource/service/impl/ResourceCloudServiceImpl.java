@@ -1,5 +1,6 @@
 package com.filmforest.resource.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceCloud;
 import com.filmforest.resource.mapper.ResourceCloudMapper;
@@ -19,10 +20,11 @@ public class ResourceCloudServiceImpl extends ServiceImpl<ResourceCloudMapper, R
 
     @Override
     public List<ResourceCloud> listByContent(String contentType, Long contentId) {
-        return lambdaQuery()
-                .eq(ResourceCloud::getContentType, contentType)
-                .eq(ResourceCloud::getContentId, contentId)
-                .orderByAsc(ResourceCloud::getSort)
-                .list();
+        return list(new QueryWrapper<ResourceCloud>()
+                .eq("content_type", contentType)
+                .eq("content_id", contentId)
+                .eq("enabled", 1)
+                .isNull("removed_at")
+                .orderByAsc("sort"));
     }
 }

@@ -9,6 +9,7 @@ import com.filmforest.content.mapper.VarietyMapper;
 import com.filmforest.content.service.VarietyService;
 import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> impl
                                     Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         Page<Variety> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Variety::getStatus, ContentStatus.PUBLISHED.code());
 
         if (year != null) {
             wrapper.eq(Variety::getYear, year);
@@ -57,6 +59,8 @@ public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> impl
 
     @Override
     public Variety getDetail(Long id) {
-        return getById(id);
+        return getOne(new LambdaQueryWrapper<Variety>()
+                .eq(Variety::getId, id)
+                .eq(Variety::getStatus, ContentStatus.PUBLISHED.code()));
     }
 }

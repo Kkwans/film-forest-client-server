@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.filmforest.content.dto.RelatedVO;
 import com.filmforest.content.entity.*;
 import com.filmforest.content.mapper.*;
+import com.filmforest.content.model.ContentStatus;
 import com.filmforest.content.service.RelatedService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -51,7 +52,9 @@ public class RelatedServiceImpl implements RelatedService {
     private <T> List<RelatedVO> queryRelated(com.baomidou.mybatisplus.core.mapper.BaseMapper<T> mapper,
                                               String type, Long id, int limit) {
         // 获取当前内容
-        T current = mapper.selectById(id);
+        T current = mapper.selectOne(new QueryWrapper<T>()
+                .eq("id", id)
+                .eq("status", ContentStatus.PUBLISHED.code()));
         if (current == null) return Collections.emptyList();
 
         String genre = getField(current, "genre");
@@ -66,6 +69,7 @@ public class RelatedServiceImpl implements RelatedService {
         if (!genres.isEmpty()) {
             QueryWrapper<T> wrapper = new QueryWrapper<>();
             wrapper.ne("id", id);
+            wrapper.eq("status", ContentStatus.PUBLISHED.code());
             wrapper.isNotNull("score_douban");
             // 对每个标签做 OR 匹配
             wrapper.and(w -> {
@@ -93,6 +97,7 @@ public class RelatedServiceImpl implements RelatedService {
         if (result.size() < limit) {
             QueryWrapper<T> wrapper = new QueryWrapper<>();
             wrapper.ne("id", id);
+            wrapper.eq("status", ContentStatus.PUBLISHED.code());
             wrapper.isNotNull("score_douban");
             if (StringUtils.isNotBlank(region)) {
                 wrapper.like("region", region);
@@ -116,6 +121,7 @@ public class RelatedServiceImpl implements RelatedService {
         if (result.size() < limit) {
             QueryWrapper<T> wrapper = new QueryWrapper<>();
             wrapper.ne("id", id);
+            wrapper.eq("status", ContentStatus.PUBLISHED.code());
             wrapper.isNotNull("score_douban");
             wrapper.orderByDesc("score_douban");
             wrapper.last("LIMIT " + (limit * 2));

@@ -1,5 +1,6 @@
 package com.filmforest.resource.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceOnline;
 import com.filmforest.resource.mapper.ResourceOnlineMapper;
@@ -19,21 +20,23 @@ public class ResourceOnlineServiceImpl extends ServiceImpl<ResourceOnlineMapper,
 
     @Override
     public List<ResourceOnline> listByContent(String contentType, Long contentId) {
-        return lambdaQuery()
-                .eq(ResourceOnline::getContentType, contentType)
-                .eq(ResourceOnline::getContentId, contentId)
-                .orderByAsc(ResourceOnline::getSort)
-                .list();
+        return list(new QueryWrapper<ResourceOnline>()
+                .eq("content_type", contentType)
+                .eq("content_id", contentId)
+                .eq("enabled", 1)
+                .isNull("removed_at")
+                .orderByAsc("sort"));
     }
 
     @Override
     public List<ResourceOnline> listByContentAndEpisode(String contentType, Long contentId, Integer season, Integer episodeNumber) {
-        return lambdaQuery()
-                .eq(ResourceOnline::getContentType, contentType)
-                .eq(ResourceOnline::getContentId, contentId)
-                .eq(season != null, ResourceOnline::getSeason, season)
-                .eq(episodeNumber != null, ResourceOnline::getEpisodeNumber, episodeNumber)
-                .orderByAsc(ResourceOnline::getSort)
-                .list();
+        return list(new QueryWrapper<ResourceOnline>()
+                .eq("content_type", contentType)
+                .eq("content_id", contentId)
+                .eq("enabled", 1)
+                .isNull("removed_at")
+                .eq(season != null, "season", season)
+                .eq(episodeNumber != null, "episode_number", episodeNumber)
+                .orderByAsc("sort"));
     }
 }

@@ -1,5 +1,6 @@
 package com.filmforest.resource.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceMagnet;
 import com.filmforest.resource.mapper.ResourceMagnetMapper;
@@ -19,10 +20,11 @@ public class ResourceMagnetServiceImpl extends ServiceImpl<ResourceMagnetMapper,
 
     @Override
     public List<ResourceMagnet> listByContent(String contentType, Long contentId) {
-        return lambdaQuery()
-                .eq(ResourceMagnet::getContentType, contentType)
-                .eq(ResourceMagnet::getContentId, contentId)
-                .orderByAsc(ResourceMagnet::getSort)
-                .list();
+        return list(new QueryWrapper<ResourceMagnet>()
+                .eq("content_type", contentType)
+                .eq("content_id", contentId)
+                .eq("enabled", 1)
+                .isNull("removed_at")
+                .orderByAsc("sort"));
     }
 }

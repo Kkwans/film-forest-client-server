@@ -1,6 +1,7 @@
 package com.filmforest.resource.controller;
 
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.service.PublishedContentAccessService;
 import com.filmforest.resource.entity.ResourceCloud;
 import com.filmforest.resource.entity.ResourceMagnet;
 import com.filmforest.resource.entity.ResourceOnline;
@@ -30,6 +31,9 @@ public class ResourceController {
     @Autowired
     private ResourceCloudService resourceCloudService;
 
+    @Autowired
+    private PublishedContentAccessService publishedContentAccessService;
+
     // ==================== 在线播放资源 ====================
 
     /**
@@ -47,6 +51,9 @@ public class ResourceController {
             @RequestParam(required = false) Integer episodeNumber) {
         log.debug("[Resource] 查询在线播放资源: contentType={}, contentId={}, season={}, episode={}",
                 contentType, contentId, season, episodeNumber);
+        if (!publishedContentAccessService.isPublished(contentType, contentId)) {
+            return Result.ok(List.of());
+        }
         List<ResourceOnline> list;
         if (season != null || episodeNumber != null) {
             list = resourceOnlineService.listByContentAndEpisode(contentType, contentId, season, episodeNumber);
@@ -66,6 +73,9 @@ public class ResourceController {
             @RequestParam String contentType,
             @RequestParam Long contentId) {
         log.debug("[Resource] 查询磁力链接: contentType={}, contentId={}", contentType, contentId);
+        if (!publishedContentAccessService.isPublished(contentType, contentId)) {
+            return Result.ok(List.of());
+        }
         return Result.ok(resourceMagnetService.listByContent(contentType, contentId));
     }
 
@@ -79,6 +89,9 @@ public class ResourceController {
             @RequestParam String contentType,
             @RequestParam Long contentId) {
         log.debug("[Resource] 查询网盘资源: contentType={}, contentId={}", contentType, contentId);
+        if (!publishedContentAccessService.isPublished(contentType, contentId)) {
+            return Result.ok(List.of());
+        }
         return Result.ok(resourceCloudService.listByContent(contentType, contentId));
     }
 }

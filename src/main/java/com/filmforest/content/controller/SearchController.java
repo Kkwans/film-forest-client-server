@@ -6,6 +6,7 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.content.dto.PageResult;
 import com.filmforest.content.entity.*;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.model.ContentStatus;
 import com.filmforest.content.service.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,11 +47,16 @@ public class SearchController {
         Set<String> seen = new LinkedHashSet<>();
 
         // 从 5 张表中分别查询标题匹配
-        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, kw, perTableLimit, seen);
-        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, kw, perTableLimit, seen);
-        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, kw, perTableLimit, seen);
-        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, kw, perTableLimit, seen);
-        suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, kw, perTableLimit, seen);
+        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, Movie::getStatus,
+                kw, perTableLimit, seen);
+        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, Drama::getStatus,
+                kw, perTableLimit, seen);
+        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, Variety::getStatus,
+                kw, perTableLimit, seen);
+        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, Anime::getStatus,
+                kw, perTableLimit, seen);
+        suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, ShortDrama::getStatus,
+                kw, perTableLimit, seen);
 
         // 取前 10 个
         List<String> suggestions = seen.stream().limit(10).collect(Collectors.toList());
@@ -84,10 +90,12 @@ public class SearchController {
             com.baomidou.mybatisplus.spring.service.IService<T> service,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> aliasField,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> statusField,
             String keyword, int limit, Set<String> seen) {
         try {
             Page<T> p = service.page(new Page<>(1, limit),
                     new LambdaQueryWrapper<T>()
+                            .eq(statusField, ContentStatus.PUBLISHED.code())
                             .and(w -> w.like(titleField, keyword)
                                     .or()
                                     .like(aliasField, keyword)));
@@ -176,7 +184,7 @@ public class SearchController {
     private long searchMovies(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<Movie>()
-                    .eq(Movie::getStatus, 1)
+                    .eq(Movie::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Movie::getTitle, kw)
                             .or().like(Movie::getAlias, kw)
                             .or().like(Movie::getActor, kw)
@@ -202,7 +210,7 @@ public class SearchController {
     private long searchDramas(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<Drama>()
-                    .eq(Drama::getStatus, 1)
+                    .eq(Drama::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Drama::getTitle, kw)
                             .or().like(Drama::getAlias, kw)
                             .or().like(Drama::getActor, kw));
@@ -227,7 +235,7 @@ public class SearchController {
     private long searchVarieties(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<Variety>()
-                    .eq(Variety::getStatus, 1)
+                    .eq(Variety::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Variety::getTitle, kw).or().like(Variety::getAlias, kw));
             applyVarietySort(wrapper, sort, !desc);
             Page<Variety> p = varietyService.page(new Page<>(1, limit), wrapper);
@@ -250,7 +258,7 @@ public class SearchController {
     private long searchAnimes(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<Anime>()
-                    .eq(Anime::getStatus, 1)
+                    .eq(Anime::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(Anime::getTitle, kw)
                             .or().like(Anime::getAlias, kw)
                             .or().like(Anime::getActor, kw));
@@ -275,7 +283,7 @@ public class SearchController {
     private long searchShortDramas(String kw, long limit, String sort, boolean desc, List<SearchResult> results) {
         try {
             LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<ShortDrama>()
-                    .eq(ShortDrama::getStatus, 1)
+                    .eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(ShortDrama::getTitle, kw).or().like(ShortDrama::getAlias, kw));
             applyShortDramaSort(wrapper, sort, !desc);
             Page<ShortDrama> p = shortDramaService.page(new Page<>(1, limit), wrapper);

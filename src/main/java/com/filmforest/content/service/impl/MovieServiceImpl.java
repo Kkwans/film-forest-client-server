@@ -9,6 +9,7 @@ import com.filmforest.content.mapper.MovieMapper;
 import com.filmforest.content.service.MovieService;
 import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
                                   Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         Page<Movie> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Movie::getStatus, ContentStatus.PUBLISHED.code());
 
         // 年份筛选：精确年份 或 年份范围
         if (year != null) {
@@ -63,6 +65,8 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
 
     @Override
     public Movie getDetail(Long id) {
-        return getById(id);
+        return getOne(new LambdaQueryWrapper<Movie>()
+                .eq(Movie::getId, id)
+                .eq(Movie::getStatus, ContentStatus.PUBLISHED.code()));
     }
 }

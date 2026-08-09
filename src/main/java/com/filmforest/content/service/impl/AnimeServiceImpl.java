@@ -9,6 +9,7 @@ import com.filmforest.content.mapper.AnimeMapper;
 import com.filmforest.content.service.AnimeService;
 import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -29,6 +30,7 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
                                   Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
         Page<Anime> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Anime::getStatus, ContentStatus.PUBLISHED.code());
 
         if (year != null) {
             wrapper.eq(Anime::getYear, year);
@@ -57,6 +59,8 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
 
     @Override
     public Anime getDetail(Long id) {
-        return getById(id);
+        return getOne(new LambdaQueryWrapper<Anime>()
+                .eq(Anime::getId, id)
+                .eq(Anime::getStatus, ContentStatus.PUBLISHED.code()));
     }
 }
