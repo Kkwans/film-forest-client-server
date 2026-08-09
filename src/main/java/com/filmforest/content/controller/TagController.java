@@ -3,6 +3,7 @@ package com.filmforest.content.controller;
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.dto.GenreOption;
 import com.filmforest.content.entity.Tag;
+import com.filmforest.content.service.PublishedGenreQueryService;
 import com.filmforest.content.service.TagService;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,9 +17,11 @@ import java.util.List;
 public class TagController {
 
     private final TagService tagService;
+    private final PublishedGenreQueryService publishedGenreQueryService;
 
-    public TagController(TagService tagService) {
+    public TagController(TagService tagService, PublishedGenreQueryService publishedGenreQueryService) {
         this.tagService = tagService;
+        this.publishedGenreQueryService = publishedGenreQueryService;
     }
 
     /**
@@ -34,9 +37,7 @@ public class TagController {
     /** 获取当前内容类型可用的系统标准题材。 */
     @GetMapping("/genres")
     public Result<List<GenreOption>> getStandardGenres(@RequestParam String contentType) {
-        return Result.ok(tagService.getStandardGenres(contentType).stream()
-                .map(GenreOption::from)
-                .toList());
+        return Result.ok(publishedGenreQueryService.listAvailable(contentType));
     }
 
     /**

@@ -2,7 +2,7 @@ package com.filmforest.content.controller;
 
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.dto.GenreOption;
-import com.filmforest.content.entity.Tag;
+import com.filmforest.content.service.PublishedGenreQueryService;
 import com.filmforest.content.service.TagService;
 import org.junit.jupiter.api.Test;
 
@@ -18,17 +18,15 @@ class TagControllerTest {
     @Test
     void standardGenreEndpointReturnsServiceCatalog() {
         TagService service = mock(TagService.class);
-        TagController controller = new TagController(service);
-        Tag drama = new Tag();
-        drama.setId(1L);
-        drama.setCode("drama");
-        drama.setName("剧情");
-        when(service.getStandardGenres("movie")).thenReturn(List.of(drama));
+        PublishedGenreQueryService genreQueryService = mock(PublishedGenreQueryService.class);
+        TagController controller = new TagController(service, genreQueryService);
+        GenreOption drama = new GenreOption(1L, "drama", "剧情", null, 3L);
+        when(genreQueryService.listAvailable("movie")).thenReturn(List.of(drama));
 
         Result<List<GenreOption>> result = controller.getStandardGenres("movie");
 
         assertThat(result.getCode()).isEqualTo(200);
-        assertThat(result.getData()).containsExactly(new GenreOption(1L, "drama", "剧情", null));
-        verify(service).getStandardGenres("movie");
+        assertThat(result.getData()).containsExactly(drama);
+        verify(genreQueryService).listAvailable("movie");
     }
 }
