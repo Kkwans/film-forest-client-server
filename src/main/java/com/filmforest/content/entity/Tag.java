@@ -1,7 +1,12 @@
 package com.filmforest.content.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import java.time.LocalDateTime;
 
 /**
@@ -14,10 +19,15 @@ public class Tag {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    private String code;
     private String name;           // 标签名称
     private String color;          // 标签颜色（hex）
     private Integer sortOrder;     // 排序权重
     private Integer usageCount;    // 使用次数
+    @Getter(AccessLevel.NONE)
+    @Setter(AccessLevel.NONE)
+    @TableField("is_system")
+    private Integer systemFlag;
 
     @TableLogic
     @TableField("is_deleted")
@@ -28,4 +38,24 @@ public class Tag {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    @JsonIgnore
+    public Integer getSystemFlag() {
+        return systemFlag;
+    }
+
+    @JsonIgnore
+    public void setSystemFlag(Integer systemFlag) {
+        this.systemFlag = systemFlag;
+    }
+
+    @JsonProperty("system")
+    public Integer getSystem() {
+        return systemFlag;
+    }
+
+    @JsonProperty("system")
+    public void setSystem(Integer system) {
+        this.systemFlag = system;
+    }
 }

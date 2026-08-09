@@ -6,31 +6,54 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.entity.ContentTag;
 import com.filmforest.content.entity.Tag;
+import com.filmforest.content.entity.TagContentType;
 import com.filmforest.content.mapper.ContentTagMapper;
+import com.filmforest.content.mapper.TagContentTypeMapper;
 import com.filmforest.content.mapper.TagMapper;
 import com.filmforest.content.service.TagService;
 import com.filmforest.content.dto.PageResult;
 import com.filmforest.content.model.ContentType;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Slf4j
 @Service
 public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements TagService {
 
-    @Autowired
-    private ContentTagMapper contentTagMapper;
+    private final ContentTagMapper contentTagMapper;
+    private final TagContentTypeMapper tagContentTypeMapper;
+
+    public TagServiceImpl(ContentTagMapper contentTagMapper, TagContentTypeMapper tagContentTypeMapper) {
+        this.contentTagMapper = contentTagMapper;
+        this.tagContentTypeMapper = tagContentTypeMapper;
+    }
 
     @Override
     public List<Tag> getAllTags() {
         return list(new LambdaQueryWrapper<Tag>()
                 .orderByDesc(Tag::getUsageCount)
                 .orderByAsc(Tag::getSortOrder));
+    }
+
+    @Override
+    public List<Tag> getStandardGenres(String contentType) {
+        String canonicalType = ContentType.parse(contentType).code();
+        List<Long> tagIds = tagContentTypeMapper.selectList(
+                        new LambdaQueryWrapper<TagContentType>()
+                                .eq(TagContentType::getContentType, canonicalType))
+                .stream()
+                .map(TagContentType::getTagId)
+                .toList();
+        if (tagIds.isEmpty()) {
+            return List.of();
+        }
+        return list(new LambdaQueryWrapper<Tag>()
+                .in(Tag::getId, tagIds)
+                .eq(Tag::getSystemFlag, 1)
+                .orderByAsc(Tag::getSortOrder)
+                .orderByAsc(Tag::getId));
     }
 
     @Override
@@ -58,10 +81,12 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements TagSe
             throw new RuntimeException("标签「" + name + "」已存在");
         }
         Tag tag = new Tag();
+        tag.setCode("custom-" + UUID.randomUUID().toString().replace("-", ""));
         tag.setName(name);
         tag.setColor(color);
         tag.setSortOrder(0);
         tag.setUsageCount(0);
+        tag.setSystem(0);
         save(tag);
         return tag;
     }

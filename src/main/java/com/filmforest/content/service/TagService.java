@@ -15,6 +15,9 @@ public interface TagService extends IService<Tag> {
      */
     List<Tag> getAllTags();
 
+    /** 获取指定内容类型适用的系统标准题材。 */
+    List<Tag> getStandardGenres(String contentType);
+
     /** 获取标签分页。 */
     IPage<Tag> pageTags(int page, int size);
 

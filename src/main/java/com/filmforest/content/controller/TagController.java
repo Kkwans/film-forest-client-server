@@ -1,10 +1,9 @@
 package com.filmforest.content.controller;
 
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.dto.GenreOption;
 import com.filmforest.content.entity.Tag;
 import com.filmforest.content.service.TagService;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,13 +11,15 @@ import java.util.List;
 /**
  * 标签管理接口
  */
-@Slf4j
 @RestController
 @RequestMapping("/api/tags")
 public class TagController {
 
-    @Autowired
-    private TagService tagService;
+    private final TagService tagService;
+
+    public TagController(TagService tagService) {
+        this.tagService = tagService;
+    }
 
     /**
      * 获取所有标签
@@ -28,6 +29,14 @@ public class TagController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int size) {
         return Result.ok(com.filmforest.content.dto.PageResult.from(tagService.pageTags(page, size)));
+    }
+
+    /** 获取当前内容类型可用的系统标准题材。 */
+    @GetMapping("/genres")
+    public Result<List<GenreOption>> getStandardGenres(@RequestParam String contentType) {
+        return Result.ok(tagService.getStandardGenres(contentType).stream()
+                .map(GenreOption::from)
+                .toList());
     }
 
     /**
