@@ -5,6 +5,7 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.content.dto.UserListItemVO;
 import com.filmforest.content.dto.ContentStatusQuery;
 import com.filmforest.content.entity.UserMovieList;
+import com.filmforest.content.model.ContentType;
 import com.filmforest.content.service.UserMovieListService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -162,10 +163,17 @@ public class UserMovieListController {
                                   @RequestParam(defaultValue = "1") int page,
                                   @RequestParam(defaultValue = "20") int size,
                                   @RequestParam(defaultValue = "addedAt") String sort,
-                                  @RequestParam(defaultValue = "desc") String sortDir) {
+                                  @RequestParam(defaultValue = "desc") String sortDir,
+                                  @RequestParam(required = false) String contentType) {
         Long userId = (Long) request.getAttribute("userId");
         try {
-            IPage<UserListItemVO> items = userMovieListService.getListItems(userId, id, page, size, sort, sortDir);
+            String normalizedType = contentType == null || contentType.isBlank()
+                    ? null
+                    : ContentType.parse(contentType).code();
+            int safePage = Math.max(page, 1);
+            int safeSize = Math.min(Math.max(size, 1), 100);
+            IPage<UserListItemVO> items = userMovieListService.getListItems(
+                    userId, id, safePage, safeSize, sort, sortDir, normalizedType);
             log.debug("[UserList] 获取片单内容: userId={}, listId={}, page={}, size={}", userId, id, page, size);
             return Result.ok(items);
         } catch (RuntimeException e) {

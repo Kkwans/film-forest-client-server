@@ -51,7 +51,8 @@ public interface UserMovieListService extends IService<UserMovieList> {
     /**
      * 获取片单内容（分页，包含影视基本信息）
      */
-    IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize, String sort, String sortDir);
+    IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize,
+                                      String sort, String sortDir, String contentType);
 
     /**
      * 更新片单条目（评分/备注）

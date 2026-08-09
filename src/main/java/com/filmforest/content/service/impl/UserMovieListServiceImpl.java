@@ -219,7 +219,8 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
     }
 
     @Override
-    public IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize, String sort, String sortDir) {
+    public IPage<UserListItemVO> getListItems(Long userId, Long listId, int pageNum, int pageSize,
+                                              String sort, String sortDir, String contentType) {
         // 校验片单归属
         UserMovieList list = getById(listId);
         if (list == null || !list.getUserId().equals(userId)) {
@@ -227,30 +228,29 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         }
 
         boolean desc = "desc".equalsIgnoreCase(sortDir);
+        LambdaQueryWrapper<UserMovieListItem> baseQuery = new LambdaQueryWrapper<UserMovieListItem>()
+                .eq(UserMovieListItem::getListId, listId);
+        if (contentType != null && !contentType.isBlank()) {
+            baseQuery.eq(UserMovieListItem::getContentType, contentType);
+        }
 
         // 对于 item 表字段的排序（addedAt, userRating），直接在 SQL 层排序
         if ("addedAt".equals(sort) || "userRating".equals(sort)) {
             Page<UserMovieListItem> page = new Page<>(pageNum, pageSize);
-            LambdaQueryWrapper<UserMovieListItem> wrapper = new LambdaQueryWrapper<UserMovieListItem>()
-                    .eq(UserMovieListItem::getListId, listId);
             if ("addedAt".equals(sort)) {
-                wrapper = desc ? wrapper.orderByDesc(UserMovieListItem::getAddedAt) : wrapper.orderByAsc(UserMovieListItem::getAddedAt);
+                baseQuery = desc ? baseQuery.orderByDesc(UserMovieListItem::getAddedAt) : baseQuery.orderByAsc(UserMovieListItem::getAddedAt);
             } else {
-                wrapper = desc ? wrapper.orderByDesc(UserMovieListItem::getRating) : wrapper.orderByAsc(UserMovieListItem::getRating);
+                baseQuery = desc ? baseQuery.orderByDesc(UserMovieListItem::getRating) : baseQuery.orderByAsc(UserMovieListItem::getRating);
             }
-            IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, wrapper);
+            IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, baseQuery);
             Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
             voPage.setTotal(itemPage.getTotal());
             voPage.setRecords(enrichItems(itemPage.getRecords()));
             return voPage;
         }
 
-        // 对于内容表字段的排序（year, douban），先查所有 items 再在 VO 层排序
-        Page<UserMovieListItem> page = new Page<>(pageNum, pageSize);
-        IPage<UserMovieListItem> itemPage = itemMapper.selectPage(page, new LambdaQueryWrapper<UserMovieListItem>()
-                .eq(UserMovieListItem::getListId, listId));
-
-        List<UserListItemVO> voList = enrichItems(itemPage.getRecords());
+        // 内容表字段不在关联表中：先对完整筛选结果补全并排序，再执行内存分页，保证跨页顺序正确。
+        List<UserListItemVO> voList = enrichItems(itemMapper.selectList(baseQuery));
 
         // 在 VO 层排序
         voList.sort((a, b) -> {
@@ -273,8 +273,10 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         });
 
         Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
-        voPage.setTotal(itemPage.getTotal());
-        voPage.setRecords(voList);
+        voPage.setTotal(voList.size());
+        int fromIndex = Math.min(Math.max(pageNum - 1, 0) * pageSize, voList.size());
+        int toIndex = Math.min(fromIndex + pageSize, voList.size());
+        voPage.setRecords(new ArrayList<>(voList.subList(fromIndex, toIndex)));
         return voPage;
     }
 
