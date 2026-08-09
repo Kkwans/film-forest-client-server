@@ -10,13 +10,12 @@ public record PublicCloudResource(
         String title,
         String url,
         String diskType,
-        String password,
         LocalDateTime createdAt,
         LocalDateTime updatedAt) {
 
     public static PublicCloudResource from(ResourceCloud resource) {
         return new PublicCloudResource(
                 resource.getId(), resource.getTitle(), resource.getUrl(), resource.getDiskType(),
-                resource.getPassword(), resource.getCreatedAt(), resource.getUpdatedAt());
+                resource.getCreatedAt(), resource.getUpdatedAt());
     }
 }
