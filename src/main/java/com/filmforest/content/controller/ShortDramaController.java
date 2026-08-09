@@ -24,8 +24,9 @@ public class ShortDramaController {
             @RequestParam(required = false) Integer yearFrom,
             @RequestParam(required = false) Integer yearTo,
             @RequestParam(required = false) Long tag,
+            @RequestParam(required = false) Boolean hasResource,
             @RequestParam(required = false, defaultValue = "desc") String sortDir) {
-        return Result.ok(shortDramaService.pageList(page, size, year, region, genre, sort, yearFrom, yearTo, tag, sortDir));
+        return Result.ok(shortDramaService.pageList(page, size, year, region, genre, sort, yearFrom, yearTo, tag, hasResource, sortDir));
     }
 
     @GetMapping("/{id}")

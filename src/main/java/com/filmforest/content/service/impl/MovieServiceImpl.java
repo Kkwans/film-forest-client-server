@@ -8,6 +8,7 @@ import com.filmforest.content.entity.Movie;
 import com.filmforest.content.mapper.MovieMapper;
 import com.filmforest.content.service.MovieService;
 import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
@@ -20,14 +21,17 @@ import org.springframework.stereotype.Service;
 public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements MovieService {
 
     private final ContentTagLookupService contentTagLookupService;
+    private final ContentResourceFilter contentResourceFilter;
 
-    public MovieServiceImpl(ContentTagLookupService contentTagLookupService) {
+    public MovieServiceImpl(ContentTagLookupService contentTagLookupService,
+                            ContentResourceFilter contentResourceFilter) {
         this.contentTagLookupService = contentTagLookupService;
+        this.contentResourceFilter = contentResourceFilter;
     }
 
     @Override
     public IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                  Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
+                                  Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
         Page<Movie> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Movie::getStatus, ContentStatus.PUBLISHED.code());
@@ -46,6 +50,7 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
         // 类型筛选（模糊匹配 JSON 字符串）
         wrapper.like(StringUtils.isNotBlank(genre), Movie::getGenre, genre);
         contentTagLookupService.apply(wrapper, Movie::getId, tagId, ContentType.MOVIE);
+        contentResourceFilter.apply(wrapper, ContentType.MOVIE, hasResource);
 
         // 排序
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);

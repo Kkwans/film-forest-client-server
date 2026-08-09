@@ -8,6 +8,7 @@ import com.filmforest.content.entity.Variety;
 import com.filmforest.content.mapper.VarietyMapper;
 import com.filmforest.content.service.VarietyService;
 import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
@@ -20,14 +21,17 @@ import org.springframework.stereotype.Service;
 public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> implements VarietyService {
 
     private final ContentTagLookupService contentTagLookupService;
+    private final ContentResourceFilter contentResourceFilter;
 
-    public VarietyServiceImpl(ContentTagLookupService contentTagLookupService) {
+    public VarietyServiceImpl(ContentTagLookupService contentTagLookupService,
+                              ContentResourceFilter contentResourceFilter) {
         this.contentTagLookupService = contentTagLookupService;
+        this.contentResourceFilter = contentResourceFilter;
     }
 
     @Override
     public IPage<Variety> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                    Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
+                                    Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
         Page<Variety> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Variety::getStatus, ContentStatus.PUBLISHED.code());
@@ -42,6 +46,7 @@ public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> impl
         wrapper.like(StringUtils.isNotBlank(region), Variety::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Variety::getGenre, genre);
         contentTagLookupService.apply(wrapper, Variety::getId, tagId, ContentType.VARIETY);
+        contentResourceFilter.apply(wrapper, ContentType.VARIETY, hasResource);
 
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
         if ("douban".equals(sort)) {

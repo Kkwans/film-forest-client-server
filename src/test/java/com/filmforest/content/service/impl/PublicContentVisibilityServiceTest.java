@@ -18,6 +18,7 @@ import com.filmforest.content.mapper.ShortDramaMapper;
 import com.filmforest.content.mapper.VarietyMapper;
 import com.filmforest.content.model.ContentStatus;
 import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.service.ContentResourceFilter;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -32,70 +33,71 @@ import static org.mockito.Mockito.verify;
 class PublicContentVisibilityServiceTest {
 
     private final ContentTagLookupService tags = mock(ContentTagLookupService.class);
+    private final ContentResourceFilter resources = mock(ContentResourceFilter.class);
 
     @Test
     void everyPublicCollectionFiltersPublishedContent() {
         MovieMapper movieMapper = mock(MovieMapper.class);
         initialize(Movie.class);
-        MovieServiceImpl movies = attach(new MovieServiceImpl(tags), movieMapper);
+        MovieServiceImpl movies = attach(new MovieServiceImpl(tags, resources), movieMapper);
         assertPublishedPage(movieMapper,
                 () -> movies.pageList(1, 20, null, null, null, null,
-                        null, null, null, "desc"));
+                        null, null, null, null, "desc"));
 
         DramaMapper dramaMapper = mock(DramaMapper.class);
         initialize(Drama.class);
-        DramaServiceImpl dramas = attach(new DramaServiceImpl(tags), dramaMapper);
+        DramaServiceImpl dramas = attach(new DramaServiceImpl(tags, resources), dramaMapper);
         assertPublishedPage(dramaMapper,
                 () -> dramas.pageList(1, 20, null, null, null, null,
-                        null, null, null, "desc"));
+                        null, null, null, null, "desc"));
 
         VarietyMapper varietyMapper = mock(VarietyMapper.class);
         initialize(Variety.class);
-        VarietyServiceImpl varieties = attach(new VarietyServiceImpl(tags), varietyMapper);
+        VarietyServiceImpl varieties = attach(new VarietyServiceImpl(tags, resources), varietyMapper);
         assertPublishedPage(varietyMapper,
                 () -> varieties.pageList(1, 20, null, null, null, null,
-                        null, null, null, "desc"));
+                        null, null, null, null, "desc"));
 
         AnimeMapper animeMapper = mock(AnimeMapper.class);
         initialize(Anime.class);
-        AnimeServiceImpl animes = attach(new AnimeServiceImpl(tags), animeMapper);
+        AnimeServiceImpl animes = attach(new AnimeServiceImpl(tags, resources), animeMapper);
         assertPublishedPage(animeMapper,
                 () -> animes.pageList(1, 20, null, null, null, null,
-                        null, null, null, "desc"));
+                        null, null, null, null, "desc"));
 
         ShortDramaMapper shortDramaMapper = mock(ShortDramaMapper.class);
         initialize(ShortDrama.class);
-        ShortDramaServiceImpl shortDramas = attach(new ShortDramaServiceImpl(tags), shortDramaMapper);
+        ShortDramaServiceImpl shortDramas = attach(new ShortDramaServiceImpl(tags, resources), shortDramaMapper);
         assertPublishedPage(shortDramaMapper,
                 () -> shortDramas.pageList(1, 20, null, null, null, null,
-                        null, null, null, "desc"));
+                        null, null, null, null, "desc"));
     }
 
     @Test
     void everyPublicDetailFiltersPublishedContent() {
         MovieMapper movieMapper = mock(MovieMapper.class);
         initialize(Movie.class);
-        MovieServiceImpl movies = attach(new MovieServiceImpl(tags), movieMapper);
+        MovieServiceImpl movies = attach(new MovieServiceImpl(tags, resources), movieMapper);
         assertPublishedDetail(movieMapper, () -> movies.getDetail(7L));
 
         DramaMapper dramaMapper = mock(DramaMapper.class);
         initialize(Drama.class);
-        DramaServiceImpl dramas = attach(new DramaServiceImpl(tags), dramaMapper);
+        DramaServiceImpl dramas = attach(new DramaServiceImpl(tags, resources), dramaMapper);
         assertPublishedDetail(dramaMapper, () -> dramas.getDetail(7L));
 
         VarietyMapper varietyMapper = mock(VarietyMapper.class);
         initialize(Variety.class);
-        VarietyServiceImpl varieties = attach(new VarietyServiceImpl(tags), varietyMapper);
+        VarietyServiceImpl varieties = attach(new VarietyServiceImpl(tags, resources), varietyMapper);
         assertPublishedDetail(varietyMapper, () -> varieties.getDetail(7L));
 
         AnimeMapper animeMapper = mock(AnimeMapper.class);
         initialize(Anime.class);
-        AnimeServiceImpl animes = attach(new AnimeServiceImpl(tags), animeMapper);
+        AnimeServiceImpl animes = attach(new AnimeServiceImpl(tags, resources), animeMapper);
         assertPublishedDetail(animeMapper, () -> animes.getDetail(7L));
 
         ShortDramaMapper shortDramaMapper = mock(ShortDramaMapper.class);
         initialize(ShortDrama.class);
-        ShortDramaServiceImpl shortDramas = attach(new ShortDramaServiceImpl(tags), shortDramaMapper);
+        ShortDramaServiceImpl shortDramas = attach(new ShortDramaServiceImpl(tags, resources), shortDramaMapper);
         assertPublishedDetail(shortDramaMapper, () -> shortDramas.getDetail(7L));
     }
 

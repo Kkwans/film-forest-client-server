@@ -24,7 +24,7 @@ public interface VarietyService extends IService<Variety> {
      * @return 分页结果
      */
     IPage<Variety> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                             Integer yearFrom, Integer yearTo, Long tagId, String sortDir);
+                             Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir);
 
     /**
      * 获取综艺详情（含在线资源和播放源）

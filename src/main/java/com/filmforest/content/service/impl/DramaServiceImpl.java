@@ -8,6 +8,7 @@ import com.filmforest.content.entity.Drama;
 import com.filmforest.content.mapper.DramaMapper;
 import com.filmforest.content.service.DramaService;
 import com.filmforest.content.service.ContentTagLookupService;
+import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import org.apache.commons.lang3.StringUtils;
@@ -20,14 +21,17 @@ import org.springframework.stereotype.Service;
 public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements DramaService {
 
     private final ContentTagLookupService contentTagLookupService;
+    private final ContentResourceFilter contentResourceFilter;
 
-    public DramaServiceImpl(ContentTagLookupService contentTagLookupService) {
+    public DramaServiceImpl(ContentTagLookupService contentTagLookupService,
+                            ContentResourceFilter contentResourceFilter) {
         this.contentTagLookupService = contentTagLookupService;
+        this.contentResourceFilter = contentResourceFilter;
     }
 
     @Override
     public IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                                  Integer yearFrom, Integer yearTo, Long tagId, String sortDir) {
+                                  Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
         LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Drama::getStatus, ContentStatus.PUBLISHED.code());
 
@@ -41,6 +45,7 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
         wrapper.like(StringUtils.isNotBlank(region), Drama::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Drama::getGenre, genre);
         contentTagLookupService.apply(wrapper, Drama::getId, tagId, ContentType.DRAMA);
+        contentResourceFilter.apply(wrapper, ContentType.DRAMA, hasResource);
 
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
         if ("douban".equals(sort)) {

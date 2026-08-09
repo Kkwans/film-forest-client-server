@@ -24,7 +24,7 @@ public interface MovieService extends IService<Movie> {
      * @return 分页结果
      */
     IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
-                           Integer yearFrom, Integer yearTo, Long tagId, String sortDir);
+                           Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir);
 
     /**
      * 获取电影详情（含在线资源和播放源）
