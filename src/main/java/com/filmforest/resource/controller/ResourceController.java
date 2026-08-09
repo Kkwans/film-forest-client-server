@@ -2,6 +2,9 @@ package com.filmforest.resource.controller;
 
 import com.filmforest.common.dto.Result;
 import com.filmforest.content.service.PublishedContentAccessService;
+import com.filmforest.resource.dto.PublicCloudResource;
+import com.filmforest.resource.dto.PublicMagnetResource;
+import com.filmforest.resource.dto.PublicOnlineResource;
 import com.filmforest.resource.entity.ResourceCloud;
 import com.filmforest.resource.entity.ResourceMagnet;
 import com.filmforest.resource.entity.ResourceOnline;
@@ -44,7 +47,7 @@ public class ResourceController {
      * @param episodeNumber 集号（可选）
      */
     @GetMapping("/online")
-    public Result<List<ResourceOnline>> listOnline(
+    public Result<List<PublicOnlineResource>> listOnline(
             @RequestParam String contentType,
             @RequestParam Long contentId,
             @RequestParam(required = false) Integer season,
@@ -60,7 +63,7 @@ public class ResourceController {
         } else {
             list = resourceOnlineService.listByContent(contentType, contentId);
         }
-        return Result.ok(list);
+        return Result.ok(list.stream().map(PublicOnlineResource::from).toList());
     }
 
     // ==================== 磁力链接资源 ====================
@@ -69,14 +72,16 @@ public class ResourceController {
      * 获取磁力链接资源列表
      */
     @GetMapping("/magnet")
-    public Result<List<ResourceMagnet>> listMagnet(
+    public Result<List<PublicMagnetResource>> listMagnet(
             @RequestParam String contentType,
             @RequestParam Long contentId) {
         log.debug("[Resource] 查询磁力链接: contentType={}, contentId={}", contentType, contentId);
         if (!publishedContentAccessService.isPublished(contentType, contentId)) {
             return Result.ok(List.of());
         }
-        return Result.ok(resourceMagnetService.listByContent(contentType, contentId));
+        return Result.ok(resourceMagnetService.listByContent(contentType, contentId).stream()
+                .map(PublicMagnetResource::from)
+                .toList());
     }
 
     // ==================== 网盘资源 ====================
@@ -85,13 +90,15 @@ public class ResourceController {
      * 获取网盘资源列表
      */
     @GetMapping("/cloud")
-    public Result<List<ResourceCloud>> listCloud(
+    public Result<List<PublicCloudResource>> listCloud(
             @RequestParam String contentType,
             @RequestParam Long contentId) {
         log.debug("[Resource] 查询网盘资源: contentType={}, contentId={}", contentType, contentId);
         if (!publishedContentAccessService.isPublished(contentType, contentId)) {
             return Result.ok(List.of());
         }
-        return Result.ok(resourceCloudService.listByContent(contentType, contentId));
+        return Result.ok(resourceCloudService.listByContent(contentType, contentId).stream()
+                .map(PublicCloudResource::from)
+                .toList());
     }
 }
