@@ -2,6 +2,7 @@ package com.filmforest.resource.dto;
 
 import com.filmforest.resource.entity.ResourceCloud;
 import com.filmforest.resource.entity.ResourceMagnet;
+import com.filmforest.resource.entity.ResourceOnline;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +39,22 @@ class PublicResourceViewTest {
     void storedSubtitleFlagStillProducesChineseSubtitleCategory() {
         assertThat(view("Movie.2160p.WEB-DL", "4K", true).qualityCategory())
                 .isEqualTo("中字4K");
+    }
+
+    @Test
+    void onlineProjectionKeepsPlaybackAndFallbackUrlsSeparate() {
+        ResourceOnline online = new ResourceOnline();
+        online.setId(9L);
+        online.setSourceName("天堂 · HD中字");
+        online.setSourceUrl("https://cdn.example.test/movie.m3u8");
+        online.setSourcePageUrl("https://www.pkmp4.xyz/py/42-1-1.html");
+        online.setPlaybackType("HLS");
+
+        PublicOnlineResource view = PublicOnlineResource.from(online);
+
+        assertThat(view.sourceUrl()).isEqualTo("https://cdn.example.test/movie.m3u8");
+        assertThat(view.sourcePageUrl()).isEqualTo("https://www.pkmp4.xyz/py/42-1-1.html");
+        assertThat(view.playbackType()).isEqualTo("HLS");
     }
 
     private static PublicMagnetResource view(String title, String resolution, boolean subtitle) {
