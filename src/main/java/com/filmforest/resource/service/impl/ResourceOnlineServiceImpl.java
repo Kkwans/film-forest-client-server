@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceOnline;
 import com.filmforest.resource.mapper.ResourceOnlineMapper;
 import com.filmforest.resource.service.ResourceOnlineService;
+import com.filmforest.content.model.ContentType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,8 +21,9 @@ public class ResourceOnlineServiceImpl extends ServiceImpl<ResourceOnlineMapper,
 
     @Override
     public List<ResourceOnline> listByContent(String contentType, Long contentId) {
+        String canonicalContentType = ContentType.parse(contentType).code();
         return list(new QueryWrapper<ResourceOnline>()
-                .eq("content_type", contentType)
+                .eq("content_type", canonicalContentType)
                 .eq("content_id", contentId)
                 .eq("enabled", 1)
                 .isNull("removed_at")
@@ -30,8 +32,9 @@ public class ResourceOnlineServiceImpl extends ServiceImpl<ResourceOnlineMapper,
 
     @Override
     public List<ResourceOnline> listByContentAndEpisode(String contentType, Long contentId, Integer season, Integer episodeNumber) {
+        String canonicalContentType = ContentType.parse(contentType).code();
         return list(new QueryWrapper<ResourceOnline>()
-                .eq("content_type", contentType)
+                .eq("content_type", canonicalContentType)
                 .eq("content_id", contentId)
                 .eq("enabled", 1)
                 .isNull("removed_at")

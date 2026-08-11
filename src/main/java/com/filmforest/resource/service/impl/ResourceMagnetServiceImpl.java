@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceMagnet;
 import com.filmforest.resource.mapper.ResourceMagnetMapper;
 import com.filmforest.resource.service.ResourceMagnetService;
+import com.filmforest.content.model.ContentType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,8 +21,9 @@ public class ResourceMagnetServiceImpl extends ServiceImpl<ResourceMagnetMapper,
 
     @Override
     public List<ResourceMagnet> listByContent(String contentType, Long contentId) {
+        String canonicalContentType = ContentType.parse(contentType).code();
         return list(new QueryWrapper<ResourceMagnet>()
-                .eq("content_type", contentType)
+                .eq("content_type", canonicalContentType)
                 .eq("content_id", contentId)
                 .eq("enabled", 1)
                 .isNull("removed_at")

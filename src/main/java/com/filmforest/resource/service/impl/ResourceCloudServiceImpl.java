@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.resource.entity.ResourceCloud;
 import com.filmforest.resource.mapper.ResourceCloudMapper;
 import com.filmforest.resource.service.ResourceCloudService;
+import com.filmforest.content.model.ContentType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,8 +21,9 @@ public class ResourceCloudServiceImpl extends ServiceImpl<ResourceCloudMapper, R
 
     @Override
     public List<ResourceCloud> listByContent(String contentType, Long contentId) {
+        String canonicalContentType = ContentType.parse(contentType).code();
         return list(new QueryWrapper<ResourceCloud>()
-                .eq("content_type", contentType)
+                .eq("content_type", canonicalContentType)
                 .eq("content_id", contentId)
                 .eq("enabled", 1)
                 .isNull("removed_at")
