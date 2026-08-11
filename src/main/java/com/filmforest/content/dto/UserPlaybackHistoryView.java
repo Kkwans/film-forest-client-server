@@ -24,4 +24,6 @@ public class UserPlaybackHistoryView {
     private String title;
     private String posterUrl;
     private Integer year;
+    private String genre;
+    private String region;
 }

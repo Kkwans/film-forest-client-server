@@ -183,6 +183,8 @@ public class UserPlaybackHistoryServiceImpl implements UserPlaybackHistoryServic
         view.setTitle(metadata.title());
         view.setPosterUrl(metadata.posterUrl());
         view.setYear(metadata.year());
+        view.setGenre(metadata.genre());
+        view.setRegion(metadata.region());
 
         ResourceOnline resource = history.getResourceOnlineId() == null
                 ? null
@@ -208,27 +210,32 @@ public class UserPlaybackHistoryServiceImpl implements UserPlaybackHistoryServic
             case MOVIE -> {
                 Movie content = movieMapper.selectById(contentId);
                 yield content == null || !isPublished(content.getStatus(), content.getDeleted())
-                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear());
+                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear(),
+                        content.getGenre(), content.getRegion());
             }
             case DRAMA -> {
                 Drama content = dramaMapper.selectById(contentId);
                 yield content == null || !isPublished(content.getStatus(), content.getDeleted())
-                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear());
+                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear(),
+                        content.getGenre(), content.getRegion());
             }
             case VARIETY -> {
                 Variety content = varietyMapper.selectById(contentId);
                 yield content == null || !isPublished(content.getStatus(), content.getDeleted())
-                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear());
+                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear(),
+                        content.getGenre(), content.getRegion());
             }
             case ANIME -> {
                 Anime content = animeMapper.selectById(contentId);
                 yield content == null || !isPublished(content.getStatus(), content.getDeleted())
-                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear());
+                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear(),
+                        content.getGenre(), content.getRegion());
             }
             case SHORT_DRAMA -> {
                 ShortDrama content = shortDramaMapper.selectById(contentId);
                 yield content == null || !isPublished(content.getStatus(), content.getDeleted())
-                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear());
+                        ? null : new ContentMetadata(content.getTitle(), content.getPosterUrl(), content.getYear(),
+                        content.getGenre(), content.getRegion());
             }
         };
     }
@@ -272,6 +279,6 @@ public class UserPlaybackHistoryServiceImpl implements UserPlaybackHistoryServic
         }
     }
 
-    private record ContentMetadata(String title, String posterUrl, Integer year) {
+    private record ContentMetadata(String title, String posterUrl, Integer year, String genre, String region) {
     }
 }

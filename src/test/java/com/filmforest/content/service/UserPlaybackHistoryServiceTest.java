@@ -134,6 +134,8 @@ class UserPlaybackHistoryServiceTest {
         assertThat(result).singleElement().satisfies(view -> {
             assertThat(view.getContentId()).isEqualTo(7L);
             assertThat(view.getTitle()).isEqualTo("电影");
+            assertThat(view.getGenre()).isEqualTo("[\"剧情\",\"喜剧\"]");
+            assertThat(view.getRegion()).isEqualTo("[\"大陆\"]");
             assertThat(view.getResourceId()).isNull();
             assertThat(view.getEpisodeNumber()).isNull();
             assertThat(view.getPositionSeconds()).isEqualTo(12L);
@@ -192,6 +194,8 @@ class UserPlaybackHistoryServiceTest {
         movie.setTitle("电影");
         movie.setPosterUrl("/poster.jpg");
         movie.setYear(2026);
+        movie.setGenre("[\"剧情\",\"喜剧\"]");
+        movie.setRegion("[\"大陆\"]");
         movie.setStatus(status);
         movie.setDeleted(deleted);
         return movie;
