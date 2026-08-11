@@ -15,11 +15,13 @@ class PublicResourceViewTest {
         cloud.setId(7L);
         cloud.setTitle("示例资源");
         cloud.setUrl("https://pan.quark.cn/s/example");
+        cloud.setPassword("ab12");
         cloud.setDiskType("quark");
 
         PublicCloudResource view = PublicCloudResource.from(cloud);
 
         assertThat(view.url()).isEqualTo("https://pan.quark.cn/s/example");
+        assertThat(view.extractionCode()).isEqualTo("ab12");
         assertThat(view.diskType()).isEqualTo("quark");
     }
 
