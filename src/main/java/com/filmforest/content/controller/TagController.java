@@ -4,7 +4,7 @@ import com.filmforest.common.dto.Result;
 import com.filmforest.content.dto.GenreOption;
 import com.filmforest.content.entity.Tag;
 import com.filmforest.content.service.PublishedGenreQueryService;
-import com.filmforest.content.service.TagService;
+import com.filmforest.content.service.PublishedTagQueryService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,12 +16,13 @@ import java.util.List;
 @RequestMapping("/api/tags")
 public class TagController {
 
-    private final TagService tagService;
     private final PublishedGenreQueryService publishedGenreQueryService;
+    private final PublishedTagQueryService publishedTagQueryService;
 
-    public TagController(TagService tagService, PublishedGenreQueryService publishedGenreQueryService) {
-        this.tagService = tagService;
+    public TagController(PublishedGenreQueryService publishedGenreQueryService,
+                         PublishedTagQueryService publishedTagQueryService) {
         this.publishedGenreQueryService = publishedGenreQueryService;
+        this.publishedTagQueryService = publishedTagQueryService;
     }
 
     /**
@@ -31,7 +32,7 @@ public class TagController {
     public Result<?> getAllTags(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "50") int size) {
-        return Result.ok(com.filmforest.content.dto.PageResult.from(tagService.pageTags(page, size)));
+        return Result.ok(com.filmforest.content.dto.PageResult.from(publishedTagQueryService.pageTags(page, size)));
     }
 
     /** 获取当前内容类型可用的系统标准题材。 */
@@ -45,7 +46,7 @@ public class TagController {
      */
     @GetMapping("/hot")
     public Result<?> getHotTags(@RequestParam(defaultValue = "20") int limit) {
-        List<Tag> tags = tagService.getHotTags(limit);
+        List<Tag> tags = publishedTagQueryService.hotTags(limit);
         return Result.ok(tags);
     }
 
@@ -56,7 +57,7 @@ public class TagController {
     public Result<?> getContentTags(
             @PathVariable String contentType,
             @PathVariable Long contentId) {
-        List<Tag> tags = tagService.getContentTags(contentId, contentType);
+        List<Tag> tags = publishedTagQueryService.getContentTags(contentType, contentId);
         return Result.ok(tags);
     }
 
@@ -69,6 +70,6 @@ public class TagController {
             @RequestParam(required = false) String contentType,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return Result.ok(tagService.getContentIdsByTag(tagId, contentType, page, size));
+        return Result.ok(publishedTagQueryService.getContentIdsByTag(tagId, contentType, page, size));
     }
 }
