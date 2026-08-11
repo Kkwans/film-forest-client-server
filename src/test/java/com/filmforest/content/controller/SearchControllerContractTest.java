@@ -84,6 +84,34 @@ class SearchControllerContractTest {
         assertThat(grouped).doesNotContainKey(ContentType.DRAMA);
     }
 
+    @Test
+    void suggestionsAreRankedAcrossTypesBeforeDeduplication() {
+        List<SearchController.SuggestionCandidate> candidates = List.of(
+                new SearchController.SuggestionCandidate("史努比大冒险", null, "movie"),
+                new SearchController.SuggestionCandidate("欢迎回家", "[\"史努比\"]", "movie"),
+                new SearchController.SuggestionCandidate("史努比", null, "anime"),
+                new SearchController.SuggestionCandidate("史努比", null, "drama"),
+                new SearchController.SuggestionCandidate("新史努比特辑", null, "variety")
+        );
+
+        assertThat(SearchController.orderSuggestionTitles(candidates, "史努比", 10))
+                .containsExactly("史努比", "欢迎回家", "史努比大冒险", "新史努比特辑");
+    }
+
+    @Test
+    void suggestionLimitAndBlankCandidatesAreHandledSafely() {
+        List<SearchController.SuggestionCandidate> candidates = List.of(
+                new SearchController.SuggestionCandidate("", null, "movie"),
+                new SearchController.SuggestionCandidate("电影甲", null, "movie"),
+                new SearchController.SuggestionCandidate("电影乙", null, "drama")
+        );
+
+        assertThat(SearchController.orderSuggestionTitles(candidates, "电影", 1))
+                .hasSize(1)
+                .allMatch(title -> title.startsWith("电影"));
+        assertThat(SearchController.orderSuggestionTitles(candidates, "电影", 0)).isEmpty();
+    }
+
     private SearchController.SearchResult result(String title, String alias, String genre) {
         return new SearchController.SearchResult(
                 1L, "movie", title, null, 2024, 8.0, null, null,

@@ -62,23 +62,21 @@ public class SearchController {
         log.debug("[Search] suggest q={}", kw);
 
         int perTableLimit = 10;
-        Set<String> seen = new LinkedHashSet<>();
+        List<SuggestionCandidate> candidates = new ArrayList<>();
 
-        // 从 5 张表中分别查询标题匹配
+        // 每类只取小候选集，再跨类型统一按相关度排序，避免电影查询顺序挤掉其他类型精确匹配。
         suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, Movie::getStatus,
-                kw, perTableLimit, seen);
+                ContentType.MOVIE.code(), kw, perTableLimit, candidates);
         suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, Drama::getStatus,
-                kw, perTableLimit, seen);
+                ContentType.DRAMA.code(), kw, perTableLimit, candidates);
         suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, Variety::getStatus,
-                kw, perTableLimit, seen);
+                ContentType.VARIETY.code(), kw, perTableLimit, candidates);
         suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, Anime::getStatus,
-                kw, perTableLimit, seen);
+                ContentType.ANIME.code(), kw, perTableLimit, candidates);
         suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, ShortDrama::getStatus,
-                kw, perTableLimit, seen);
+                ContentType.SHORT_DRAMA.code(), kw, perTableLimit, candidates);
 
-        // 取前 10 个
-        List<String> suggestions = seen.stream().limit(10).collect(Collectors.toList());
-        return Result.ok(suggestions);
+        return Result.ok(orderSuggestionTitles(candidates, kw, 10));
     }
 
     /** 热门搜索：基于真实搜索日志聚合近 30 天关键词。 */
@@ -109,7 +107,7 @@ public class SearchController {
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> aliasField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> statusField,
-            String keyword, int limit, Set<String> seen) {
+            String contentType, String keyword, int limit, List<SuggestionCandidate> candidates) {
         try {
             Page<T> p = service.page(new Page<>(1, limit),
                     new LambdaQueryWrapper<T>()
@@ -121,7 +119,8 @@ public class SearchController {
                 // 通过反射获取 title
                 String title = getTitleFromEntity(entity);
                 if (title != null && !title.isBlank()) {
-                    seen.add(title);
+                    candidates.add(new SuggestionCandidate(
+                            title.trim(), getStringProperty(entity, "getAlias"), contentType));
                 }
             }
         } catch (Exception e) {
@@ -131,13 +130,55 @@ public class SearchController {
 
     /** 从实体中提取 title 字段 */
     private String getTitleFromEntity(Object entity) {
+        return getStringProperty(entity, "getTitle");
+    }
+
+    private String getStringProperty(Object entity, String getterName) {
         try {
-            var method = entity.getClass().getMethod("getTitle");
+            var method = entity.getClass().getMethod(getterName);
             Object val = method.invoke(entity);
             return val != null ? val.toString() : null;
         } catch (Exception e) {
             return null;
         }
+    }
+
+    static List<String> orderSuggestionTitles(List<SuggestionCandidate> candidates,
+                                               String keyword,
+                                               int limit) {
+        if (candidates == null || candidates.isEmpty() || limit <= 0) {
+            return List.of();
+        }
+        LinkedHashSet<String> titles = candidates.stream()
+                .filter(Objects::nonNull)
+                .filter(candidate -> candidate.title() != null && !candidate.title().isBlank())
+                .sorted(Comparator.comparingInt((SuggestionCandidate candidate) ->
+                                suggestionRank(candidate, keyword))
+                        .thenComparingInt(candidate -> candidate.title().length())
+                        .thenComparing(SuggestionCandidate::title, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(SuggestionCandidate::contentType))
+                .map(SuggestionCandidate::title)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return titles.stream().limit(limit).toList();
+    }
+
+    private static int suggestionRank(SuggestionCandidate candidate, String keyword) {
+        String normalizedKeyword = normalizeSuggestionText(keyword);
+        String title = normalizeSuggestionText(candidate.title());
+        String alias = normalizeSuggestionText(candidate.alias());
+        if (title.equals(normalizedKeyword)) return 0;
+        if (alias.equals(normalizedKeyword) || alias.contains("\"" + normalizedKeyword + "\"")) return 1;
+        if (title.startsWith(normalizedKeyword)) return 2;
+        if (title.contains(normalizedKeyword)) return 3;
+        if (alias.contains(normalizedKeyword)) return 4;
+        return 5;
+    }
+
+    private static String normalizeSuggestionText(String value) {
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    record SuggestionCandidate(String title, String alias, String contentType) {
     }
 
     /**
