@@ -101,11 +101,12 @@ public class PosterEnrichmentService {
 
     private PosterResolutionView original(ContentType type, long id, String diagnostic,
                                           ContentPosterMatch match) {
+        boolean accepted = match != null && "accepted".equals(match.getMatchStatus());
         return new PosterResolutionView(type.code(), id, null, "original",
                 match == null ? "not_attempted" : match.getMatchStatus(), diagnostic,
                 match == null ? null : match.getConfidence(), match == null ? null : match.getMatchedAt(),
-                match == null ? null : match.getTmdbScore(),
-                match == null ? null : match.getTmdbVoteCount());
+                accepted ? match.getTmdbScore() : null,
+                accepted ? match.getTmdbVoteCount() : null);
     }
 
     private PosterResolutionView fromMatch(ContentPosterMatch match, String posterUrl, String source,

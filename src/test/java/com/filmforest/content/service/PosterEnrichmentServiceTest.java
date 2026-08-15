@@ -10,6 +10,9 @@ import com.filmforest.content.poster.tmdb.TmdbPosterMatcher;
 import com.filmforest.content.poster.tmdb.TmdbApiClient.TmdbApiException;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -89,6 +92,27 @@ class PosterEnrichmentServiceTest {
         assertThat(result.tmdbVoteCount()).isNull();
         verify(matchService).saveError(ContentType.MOVIE, 8L, "https://source.example/poster.jpg",
                 "network_error", 0);
+    }
+
+    @Test
+    void pendingMatchKeepsDiagnosticStateButDoesNotExposeTmdbVotesOnFallback() {
+        ContentPosterMatch pending = new ContentPosterMatch();
+        pending.setMatchStatus("pending");
+        pending.setTmdbScore(new BigDecimal("8.6"));
+        pending.setTmdbVoteCount(987);
+        pending.setUpdatedAt(LocalDateTime.now(ZoneOffset.UTC));
+        when(settingService.get(7L)).thenReturn(setting("tmdb", true));
+        when(matchService.find(ContentType.MOVIE, 8L)).thenReturn(pending);
+        when(matchService.acceptedPosterUrl(pending)).thenReturn(null);
+
+        var result = service.enrich(7L, "movie", 8L);
+
+        assertThat(result.source()).isEqualTo("original");
+        assertThat(result.matchStatus()).isEqualTo("pending");
+        assertThat(result.tmdbScore()).isNull();
+        assertThat(result.tmdbVoteCount()).isNull();
+        verify(settingService, never()).requireCredential(7L);
+        verifyNoInteractions(matcher);
     }
 
     private PosterSettingView setting(String source, boolean configured) {

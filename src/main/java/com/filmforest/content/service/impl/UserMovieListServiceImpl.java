@@ -246,7 +246,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         LambdaQueryWrapper<UserMovieListItem> baseQuery = new LambdaQueryWrapper<UserMovieListItem>()
                 .eq(UserMovieListItem::getListId, listId);
         if (contentType != null && !contentType.isBlank()) {
-            baseQuery.eq(UserMovieListItem::getContentType, contentType);
+            baseQuery.eq(UserMovieListItem::getContentType, ContentType.parse(contentType).code());
         }
 
         // 先过滤未上线内容，再对完整可见集合排序和分页，避免总数、页数或条目泄露草稿/下线内容。
@@ -599,11 +599,31 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
 
     @Override
     public Map<Long, List<Map<String, Object>>> getMovieStatusBatch(Long userId, List<Long> movieIds, String contentType) {
+        if (movieIds == null || movieIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        ContentType normalizedType = ContentType.parse(contentType);
         // 只查一次用户片单，共享给所有 movieId
         List<UserMovieList> lists = getUserLists(userId);
-        Map<Long, List<Map<String, Object>>> result = new HashMap<>();
+        if (lists.isEmpty()) {
+            return movieIds.stream().filter(Objects::nonNull)
+                    .collect(Collectors.toMap(Function.identity(), ignored -> Collections.emptyList(),
+                            (first, ignored) -> first, LinkedHashMap::new));
+        }
+
+        Set<ContentKey> requestedKeys = movieIds.stream()
+                .filter(Objects::nonNull)
+                .map(movieId -> new ContentKey(normalizedType.code(), movieId))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Set<ContentKey> publishedKeys = findPublishedKeys(requestedKeys);
+        Map<Long, List<Map<String, Object>>> result = new LinkedHashMap<>();
         for (Long movieId : movieIds) {
-            result.put(movieId, getMovieStatusInternal(userId, movieId, contentType, lists));
+            if (movieId == null || !publishedKeys.contains(new ContentKey(normalizedType.code(), movieId))) {
+                result.put(movieId, Collections.emptyList());
+            } else {
+                result.put(movieId, getMovieStatusInternal(userId, movieId, normalizedType.code(), lists));
+            }
         }
         return result;
     }

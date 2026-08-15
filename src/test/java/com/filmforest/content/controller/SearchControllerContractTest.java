@@ -1,7 +1,24 @@
 package com.filmforest.content.controller;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.AbstractWrapper;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.filmforest.common.dto.Result;
+import com.filmforest.content.dto.PageResult;
+import com.filmforest.content.entity.Movie;
+import com.filmforest.content.mapper.MovieMapper;
 import com.filmforest.content.model.ContentType;
+import com.filmforest.content.service.AnimeService;
+import com.filmforest.content.service.ContentResourceFilter;
+import com.filmforest.content.service.DramaService;
+import com.filmforest.content.service.MovieService;
+import com.filmforest.content.service.ShortDramaService;
+import com.filmforest.content.service.VarietyService;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
@@ -9,6 +26,10 @@ import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class SearchControllerContractTest {
 
@@ -65,6 +86,74 @@ class SearchControllerContractTest {
                 null, "[\"演员\"]", null, 2024)).containsExactly("actor");
         assertThat(SearchController.matchedFields("2024", "标题", null, null,
                 null, null, "[\"剧情\"]", 2024)).containsExactly("year");
+    }
+
+    @Test
+    void searchUsesWriterContractAndAppliesRegionGenreAndLanguageFilters() {
+        initialize(Movie.class, "search-contract-movie");
+        MovieService movieService = mock(MovieService.class);
+        Movie movie = new Movie();
+        movie.setId(7L);
+        movie.setTitle("测试电影");
+        movie.setAlias("[\"别名\"]");
+        movie.setWriter("[\"编剧甲\"]");
+        movie.setDirector("[\"导演甲\"]");
+        movie.setActor("[\"主演甲\"]");
+        movie.setGenre("[\"剧情\"]");
+        movie.setRegion("[\"美国\"]");
+        movie.setLanguage("[\"英语\"]");
+        movie.setReleaseDate("2024-01-02");
+        movie.setScoreDoubanCount(100);
+        movie.setScoreImdbCount(null);
+        movie.setScoreRtCriticCount(null);
+        movie.setScoreRtAudienceCount(25);
+        when(movieService.list(any(Wrapper.class))).thenReturn(List.of(movie));
+
+        SearchController controller = controller(movieService);
+        Result<?> response = controller.search("编剧甲", 1, 20, "movie", null, null,
+                " 美国 ", " 剧情 ", " 英语 ", null, "relevance", "desc");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<Movie>> wrapper = (ArgumentCaptor<Wrapper<Movie>>) (ArgumentCaptor<?>)
+                ArgumentCaptor.forClass(Wrapper.class);
+        verify(movieService).list(wrapper.capture());
+        assertThat(wrapper.getValue().getSqlSegment())
+                .contains("writer", "director", "actor", "alias", "region", "genre", "language");
+        assertThat(((AbstractWrapper<?, ?, ?>) wrapper.getValue()).getParamNameValuePairs().values())
+                .contains("%美国%", "%剧情%", "%英语%");
+
+        PageResult<?> page = (PageResult<?>) response.getData();
+        SearchController.SearchResult result = (SearchController.SearchResult) page.records().get(0);
+        assertThat(result.alias()).isEqualTo("[\"别名\"]");
+        assertThat(result.writer()).isEqualTo("[\"编剧甲\"]");
+        assertThat(result.releaseDate()).isEqualTo("2024-01-02");
+        assertThat(result.totalEpisode()).isNull();
+        assertThat(result.scoreDoubanCount()).isEqualTo(100);
+        assertThat(result.scoreImdbCount()).isNull();
+        assertThat(result.scoreRtCriticCount()).isNull();
+        assertThat(result.scoreRtAudienceCount()).isEqualTo(25);
+    }
+
+    @Test
+    void suggestionsSearchDirectorAndActorInAdditionToAliasAndWriter() {
+        initialize(Movie.class, "suggest-contract-movie");
+        MovieService movieService = mock(MovieService.class);
+        Movie movie = new Movie();
+        movie.setTitle("导演主演电影");
+        Page<Movie> page = new Page<>(1, 10);
+        page.setRecords(List.of(movie));
+        when(movieService.page(any(Page.class), any(Wrapper.class))).thenReturn(page);
+
+        SearchController controller = controller(movieService);
+        Result<?> response = controller.suggest("导演");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Wrapper<Movie>> wrapper = (ArgumentCaptor<Wrapper<Movie>>) (ArgumentCaptor<?>)
+                ArgumentCaptor.forClass(Wrapper.class);
+        verify(movieService).page(any(Page.class), wrapper.capture());
+        assertThat(wrapper.getValue().getSqlSegment())
+                .contains("alias", "writer", "director", "actor");
+        assertThat((List<?>) response.getData()).singleElement().isEqualTo("导演主演电影");
     }
 
     @Test
@@ -130,5 +219,25 @@ class SearchControllerContractTest {
         return new SearchController.SearchResult(
                 1L, "movie", title, null, 2024, 8.0, null, null,
                 null, null, null, genre, null, null, null, alias, null);
+    }
+
+    private SearchController controller(MovieService movieService) {
+        DramaService dramaService = mock(DramaService.class);
+        VarietyService varietyService = mock(VarietyService.class);
+        AnimeService animeService = mock(AnimeService.class);
+        ShortDramaService shortDramaService = mock(ShortDramaService.class);
+        when(dramaService.page(any(Page.class), any(Wrapper.class))).thenReturn(new Page<>());
+        when(varietyService.page(any(Page.class), any(Wrapper.class))).thenReturn(new Page<>());
+        when(animeService.page(any(Page.class), any(Wrapper.class))).thenReturn(new Page<>());
+        when(shortDramaService.page(any(Page.class), any(Wrapper.class))).thenReturn(new Page<>());
+        return new SearchController(movieService, dramaService, varietyService, animeService, shortDramaService,
+                mock(org.springframework.jdbc.core.JdbcTemplate.class),
+                mock(ContentResourceFilter.class));
+    }
+
+    private void initialize(Class<?> entityType, String namespace) {
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), namespace);
+        assistant.setCurrentNamespace(namespace);
+        TableInfoHelper.initTableInfo(assistant, entityType);
     }
 }

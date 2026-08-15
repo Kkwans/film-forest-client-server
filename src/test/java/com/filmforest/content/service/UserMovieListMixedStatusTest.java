@@ -96,4 +96,33 @@ class UserMovieListMixedStatusTest {
                 .satisfies(status -> assertThat(status.get("added")).isEqualTo(false));
         verify(itemMapper).selectList(any(Wrapper.class));
     }
+
+    @Test
+    void legacyBatchStatusNormalizesShortAliasAndHidesUnpublishedContent() {
+        UserMovieList watched = new UserMovieList();
+        watched.setId(9L);
+        watched.setName("看过");
+        watched.setType("watched");
+        watched.setIsDefault(1);
+
+        UserMovieListItem visibleItem = new UserMovieListItem();
+        visibleItem.setListId(9L);
+        visibleItem.setMovieId(7L);
+        visibleItem.setContentType("short_drama");
+
+        when(listMapper.selectList(any(Wrapper.class))).thenReturn(List.of(watched));
+        when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(visibleItem));
+        ShortDrama publishedShortDrama = new ShortDrama();
+        publishedShortDrama.setId(7L);
+        publishedShortDrama.setStatus(1);
+        when(shortDramaMapper.selectList(org.mockito.ArgumentMatchers.<Wrapper<ShortDrama>>any()))
+                .thenReturn(List.of(publishedShortDrama));
+
+        var result = service.getMovieStatusBatch(42L, List.of(7L, 8L), "short");
+
+        assertThat(result.keySet()).containsExactly(7L, 8L);
+        assertThat(result.get(7L)).singleElement()
+                .satisfies(status -> assertThat(status.get("added")).isEqualTo(true));
+        assertThat(result.get(8L)).isEmpty();
+    }
 }

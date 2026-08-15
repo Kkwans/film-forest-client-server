@@ -25,6 +25,7 @@ import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -94,6 +95,10 @@ class UserMovieListVisibilityAndRatingTest {
         when(listMapper.selectById(9L)).thenReturn(list("custom"));
         UserMovieListItem visible = item(1L);
         UserMovieListItem hidden = item(2L);
+        LocalDateTime addedAt = LocalDateTime.of(2026, 8, 15, 1, 2, 3);
+        LocalDateTime watchedAt = LocalDateTime.of(2026, 8, 15, 1, 3, 4);
+        visible.setAddedAt(addedAt);
+        visible.setWatchedAt(watchedAt);
         when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(visible, hidden));
         Movie movie = new Movie();
         movie.setId(1L);
@@ -122,6 +127,9 @@ class UserMovieListVisibilityAndRatingTest {
                     assertThat(item.getScoreImdbCount()).isEqualTo(200);
                     assertThat(item.getScoreRtCriticCount()).isEqualTo(12);
                     assertThat(item.getScoreRtAudienceCount()).isEqualTo(34);
+                    assertThat(item.getTotalEpisode()).isNull();
+                    assertThat(item.getAddedAt()).isEqualTo(addedAt.atOffset(ZoneOffset.UTC));
+                    assertThat(item.getWatchedAt()).isEqualTo(watchedAt.atOffset(ZoneOffset.UTC));
                 });
     }
 

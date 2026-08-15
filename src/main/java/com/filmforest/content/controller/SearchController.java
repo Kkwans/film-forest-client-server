@@ -65,16 +65,20 @@ public class SearchController {
         List<SuggestionCandidate> candidates = new ArrayList<>();
 
         // 每类只取小候选集，再跨类型统一按相关度排序，避免电影查询顺序挤掉其他类型精确匹配。
-        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, Movie::getWriter, Movie::getStatus,
+        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, Movie::getWriter,
+                Movie::getDirector, Movie::getActor, Movie::getStatus,
                 ContentType.MOVIE.code(), kw, perTableLimit, candidates);
-        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, Drama::getWriter, Drama::getStatus,
+        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, Drama::getWriter,
+                Drama::getDirector, Drama::getActor, Drama::getStatus,
                 ContentType.DRAMA.code(), kw, perTableLimit, candidates);
-        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, Variety::getWriter, Variety::getStatus,
+        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, Variety::getWriter,
+                Variety::getDirector, Variety::getActor, Variety::getStatus,
                 ContentType.VARIETY.code(), kw, perTableLimit, candidates);
-        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, Anime::getWriter, Anime::getStatus,
+        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, Anime::getWriter,
+                Anime::getDirector, Anime::getActor, Anime::getStatus,
                 ContentType.ANIME.code(), kw, perTableLimit, candidates);
         suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, ShortDrama::getWriter,
-                ShortDrama::getStatus,
+                ShortDrama::getDirector, ShortDrama::getActor, ShortDrama::getStatus,
                 ContentType.SHORT_DRAMA.code(), kw, perTableLimit, candidates);
 
         return Result.ok(orderSuggestionTitles(candidates, kw, 10));
@@ -108,6 +112,8 @@ public class SearchController {
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> aliasField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> writerField,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> directorField,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> actorField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> statusField,
             String contentType, String keyword, int limit, List<SuggestionCandidate> candidates) {
         try {
@@ -116,7 +122,9 @@ public class SearchController {
                     .eq(statusField, ContentStatus.PUBLISHED.code())
                     .and(w -> w.like(titleField, keyword)
                                     .or().like(aliasField, keyword)
-                                    .or().like(writerField, keyword)));
+                                    .or().like(writerField, keyword)
+                                    .or().like(directorField, keyword)
+                                    .or().like(actorField, keyword)));
             for (T entity : p.getRecords()) {
                 // 通过反射获取 title
                 String title = getTitleFromEntity(entity);
@@ -196,6 +204,8 @@ public class SearchController {
             @RequestParam(required = false) Long tagId,
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) String region,
+            @RequestParam(required = false) String genre,
+            @RequestParam(required = false) String language,
             @RequestParam(required = false) Boolean hasResource,
             @RequestParam(defaultValue = "relevance") String sort,
             @RequestParam(defaultValue = "desc") String sortDir) {
@@ -219,33 +229,36 @@ public class SearchController {
         long perTableLimit = from + safeSize;
         Set<ContentType> selectedTypes = parseTypeFilter(typeFilter);
         Map<ContentType, Set<Long>> tagMatches = loadTagMatches(tagId, selectedTypes);
-        String normalizedRegion = region == null || region.isBlank() ? null : region.trim();
+        String normalizedRegion = normalizeFilter(region);
+        String normalizedGenre = normalizeFilter(genre);
+        String normalizedLanguage = normalizeFilter(language);
         boolean desc = "desc".equalsIgnoreCase(sortDir);
-        log.debug("[Search] keyword={}, page={}, size={}, types={}, tagId={}, year={}, region={}, hasResource={}, sort={}, sortDir={}",
-                kw, safePage, safeSize, selectedTypes, tagId, year, normalizedRegion, hasResource, normalizedSort, sortDir);
+        log.debug("[Search] keyword={}, page={}, size={}, types={}, tagId={}, year={}, region={}, genre={}, language={}, hasResource={}, sort={}, sortDir={}",
+                kw, safePage, safeSize, selectedTypes, tagId, year, normalizedRegion, normalizedGenre,
+                normalizedLanguage, hasResource, normalizedSort, sortDir);
 
         List<SearchResult> allResults = new ArrayList<>();
 
         long total = 0;
         if (shouldSearch(ContentType.MOVIE, selectedTypes, tagId, tagMatches)) {
             total += searchMovies(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.MOVIE),
-                    year, normalizedRegion, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
         }
         if (shouldSearch(ContentType.DRAMA, selectedTypes, tagId, tagMatches)) {
             total += searchDramas(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.DRAMA),
-                    year, normalizedRegion, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
         }
         if (shouldSearch(ContentType.VARIETY, selectedTypes, tagId, tagMatches)) {
             total += searchVarieties(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.VARIETY),
-                    year, normalizedRegion, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
         }
         if (shouldSearch(ContentType.ANIME, selectedTypes, tagId, tagMatches)) {
             total += searchAnimes(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.ANIME),
-                    year, normalizedRegion, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
         }
         if (shouldSearch(ContentType.SHORT_DRAMA, selectedTypes, tagId, tagMatches)) {
             total += searchShortDramas(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.SHORT_DRAMA),
-                    year, normalizedRegion, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
         }
 
         Comparator<SearchResult> comparator = getSearchResultComparator(normalizedSort, desc, kw);
@@ -272,14 +285,17 @@ public class SearchController {
 
     private long searchMovies(String kw, long limit, String sort, boolean desc,
                               Set<Long> taggedContentIds, Integer year, String region,
-                              Boolean hasResource, List<SearchResult> results) {
+                              String genre, String language, Boolean hasResource,
+                              List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<Movie>()
                     .eq(Movie::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.MOVIE, kw, Movie::getTitle, Movie::getAlias,
                     Movie::getWriter, Movie::getActor, Movie::getDirector, Movie::getGenre, Movie::getYear);
             wrapper.eq(year != null, Movie::getYear, year)
-                    .like(region != null, Movie::getRegion, region);
+                    .like(region != null, Movie::getRegion, region)
+                    .like(genre != null, Movie::getGenre, genre)
+                    .like(language != null, Movie::getLanguage, language);
             wrapper.in(taggedContentIds != null, Movie::getId, taggedContentIds);
             contentResourceFilter.apply(wrapper, ContentType.MOVIE, hasResource);
             List<Movie> records;
@@ -315,14 +331,17 @@ public class SearchController {
 
     private long searchDramas(String kw, long limit, String sort, boolean desc,
                               Set<Long> taggedContentIds, Integer year, String region,
-                              Boolean hasResource, List<SearchResult> results) {
+                              String genre, String language, Boolean hasResource,
+                              List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<Drama>()
                     .eq(Drama::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.DRAMA, kw, Drama::getTitle, Drama::getAlias,
                     Drama::getWriter, Drama::getActor, Drama::getDirector, Drama::getGenre, Drama::getYear);
             wrapper.eq(year != null, Drama::getYear, year)
-                    .like(region != null, Drama::getRegion, region);
+                    .like(region != null, Drama::getRegion, region)
+                    .like(genre != null, Drama::getGenre, genre)
+                    .like(language != null, Drama::getLanguage, language);
             wrapper.in(taggedContentIds != null, Drama::getId, taggedContentIds);
             contentResourceFilter.apply(wrapper, ContentType.DRAMA, hasResource);
             List<Drama> records;
@@ -357,14 +376,17 @@ public class SearchController {
 
     private long searchVarieties(String kw, long limit, String sort, boolean desc,
                                  Set<Long> taggedContentIds, Integer year, String region,
-                                 Boolean hasResource, List<SearchResult> results) {
+                                 String genre, String language, Boolean hasResource,
+                                 List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<Variety>()
                     .eq(Variety::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.VARIETY, kw, Variety::getTitle, Variety::getAlias,
                     Variety::getWriter, Variety::getActor, Variety::getDirector, Variety::getGenre, Variety::getYear);
             wrapper.eq(year != null, Variety::getYear, year)
-                    .like(region != null, Variety::getRegion, region);
+                    .like(region != null, Variety::getRegion, region)
+                    .like(genre != null, Variety::getGenre, genre)
+                    .like(language != null, Variety::getLanguage, language);
             wrapper.in(taggedContentIds != null, Variety::getId, taggedContentIds);
             contentResourceFilter.apply(wrapper, ContentType.VARIETY, hasResource);
             List<Variety> records;
@@ -399,14 +421,17 @@ public class SearchController {
 
     private long searchAnimes(String kw, long limit, String sort, boolean desc,
                               Set<Long> taggedContentIds, Integer year, String region,
-                              Boolean hasResource, List<SearchResult> results) {
+                              String genre, String language, Boolean hasResource,
+                              List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<Anime>()
                     .eq(Anime::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.ANIME, kw, Anime::getTitle, Anime::getAlias,
                     Anime::getWriter, Anime::getActor, Anime::getDirector, Anime::getGenre, Anime::getYear);
             wrapper.eq(year != null, Anime::getYear, year)
-                    .like(region != null, Anime::getRegion, region);
+                    .like(region != null, Anime::getRegion, region)
+                    .like(genre != null, Anime::getGenre, genre)
+                    .like(language != null, Anime::getLanguage, language);
             wrapper.in(taggedContentIds != null, Anime::getId, taggedContentIds);
             contentResourceFilter.apply(wrapper, ContentType.ANIME, hasResource);
             List<Anime> records;
@@ -441,7 +466,8 @@ public class SearchController {
 
     private long searchShortDramas(String kw, long limit, String sort, boolean desc,
                                    Set<Long> taggedContentIds, Integer year, String region,
-                                   Boolean hasResource, List<SearchResult> results) {
+                                   String genre, String language, Boolean hasResource,
+                                   List<SearchResult> results) {
         try {
             LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<ShortDrama>()
                     .eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code());
@@ -449,7 +475,9 @@ public class SearchController {
                     ShortDrama::getWriter, ShortDrama::getActor, ShortDrama::getDirector, ShortDrama::getGenre,
                     ShortDrama::getYear);
             wrapper.eq(year != null, ShortDrama::getYear, year)
-                    .like(region != null, ShortDrama::getRegion, region);
+                    .like(region != null, ShortDrama::getRegion, region)
+                    .like(genre != null, ShortDrama::getGenre, genre)
+                    .like(language != null, ShortDrama::getLanguage, language);
             wrapper.in(taggedContentIds != null, ShortDrama::getId, taggedContentIds);
             contentResourceFilter.apply(wrapper, ContentType.SHORT_DRAMA, hasResource);
             List<ShortDrama> records;
@@ -515,6 +543,12 @@ public class SearchController {
             case "rating", "douban", "imdb", "rt" -> "rating";
             default -> "relevance";
         };
+    }
+
+    private static String normalizeFilter(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private <T> void applyKeyword(
@@ -709,7 +743,7 @@ public class SearchController {
         if (title.contains(normalized)) return 700;
         if (containsIgnoreCase(result.alias, normalized)) return 600;
         if (containsIgnoreCase(result.genre, normalized)) return 500;
-        if (containsIgnoreCase(result.writers, normalized)) return 400;
+        if (containsIgnoreCase(result.writer, normalized)) return 400;
         if (containsIgnoreCase(result.actor, normalized)) return 400;
         if (containsIgnoreCase(result.director, normalized)) return 400;
         if (result.year != null && String.valueOf(result.year).equals(normalized)) return 300;
@@ -764,7 +798,7 @@ public class SearchController {
             Integer totalEpisode,  // 总集数
             String alias,          // 别名（JSON数组字符串）
             Long updatedAtMs,      // 更新时间戳（毫秒）
-            String writers,        // 编剧（JSON数组字符串）
+            String writer,         // 编剧（JSON数组字符串）
             String directors,      // 导演（JSON数组字符串）
             String actors,         // 演员（JSON数组字符串）
             String releaseDate,    // 上映/首播日期

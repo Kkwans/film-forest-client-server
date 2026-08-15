@@ -58,7 +58,15 @@ public class ContentDetailEnrichmentService {
                        java.util.function.Consumer<Integer> voteCountSetter) {
         if (type == null || contentId == null) return;
         ContentPosterMatch match = matchService.find(type, contentId);
-        if (match == null) return;
+        if (match == null || !"accepted".equals(match.getMatchStatus())) {
+            // pending/not_found/error rows are diagnostic state only; they must not
+            // drive the public detail rating or vote-count presentation.
+            scoreSetter.accept(null);
+            voteCountSetter.accept(null);
+            return;
+        }
+        // TMDB score and vote count are independent nullable values. Do not
+        // derive either one from another source's rating/count columns.
         scoreSetter.accept(match.getTmdbScore());
         voteCountSetter.accept(match.getTmdbVoteCount());
     }
