@@ -26,6 +26,10 @@ public interface DramaService extends IService<Drama> {
     IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                            Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir);
 
+    IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                          Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                          String language);
+
     /**
      * 获取电视剧详情（含在线资源和播放源）
      * @param id 电视剧ID

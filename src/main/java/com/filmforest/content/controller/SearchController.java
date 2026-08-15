@@ -65,15 +65,16 @@ public class SearchController {
         List<SuggestionCandidate> candidates = new ArrayList<>();
 
         // 每类只取小候选集，再跨类型统一按相关度排序，避免电影查询顺序挤掉其他类型精确匹配。
-        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, Movie::getStatus,
+        suggestFromTable(movieService, Movie::getTitle, Movie::getAlias, Movie::getWriter, Movie::getStatus,
                 ContentType.MOVIE.code(), kw, perTableLimit, candidates);
-        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, Drama::getStatus,
+        suggestFromTable(dramaService, Drama::getTitle, Drama::getAlias, Drama::getWriter, Drama::getStatus,
                 ContentType.DRAMA.code(), kw, perTableLimit, candidates);
-        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, Variety::getStatus,
+        suggestFromTable(varietyService, Variety::getTitle, Variety::getAlias, Variety::getWriter, Variety::getStatus,
                 ContentType.VARIETY.code(), kw, perTableLimit, candidates);
-        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, Anime::getStatus,
+        suggestFromTable(animeService, Anime::getTitle, Anime::getAlias, Anime::getWriter, Anime::getStatus,
                 ContentType.ANIME.code(), kw, perTableLimit, candidates);
-        suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, ShortDrama::getStatus,
+        suggestFromTable(shortDramaService, ShortDrama::getTitle, ShortDrama::getAlias, ShortDrama::getWriter,
+                ShortDrama::getStatus,
                 ContentType.SHORT_DRAMA.code(), kw, perTableLimit, candidates);
 
         return Result.ok(orderSuggestionTitles(candidates, kw, 10));
@@ -106,15 +107,16 @@ public class SearchController {
             com.baomidou.mybatisplus.spring.service.IService<T> service,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> titleField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> aliasField,
+            com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> writerField,
             com.baomidou.mybatisplus.core.toolkit.support.SFunction<T, ?> statusField,
             String contentType, String keyword, int limit, List<SuggestionCandidate> candidates) {
         try {
             Page<T> p = service.page(new Page<>(1, limit),
                     new LambdaQueryWrapper<T>()
-                            .eq(statusField, ContentStatus.PUBLISHED.code())
-                            .and(w -> w.like(titleField, keyword)
-                                    .or()
-                                    .like(aliasField, keyword)));
+                    .eq(statusField, ContentStatus.PUBLISHED.code())
+                    .and(w -> w.like(titleField, keyword)
+                                    .or().like(aliasField, keyword)
+                                    .or().like(writerField, keyword)));
             for (T entity : p.getRecords()) {
                 // 通过反射获取 title
                 String title = getTitleFromEntity(entity);
@@ -275,7 +277,7 @@ public class SearchController {
             LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<Movie>()
                     .eq(Movie::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.MOVIE, kw, Movie::getTitle, Movie::getAlias,
-                    Movie::getActor, Movie::getDirector, Movie::getGenre, Movie::getYear);
+                    Movie::getWriter, Movie::getActor, Movie::getDirector, Movie::getGenre, Movie::getYear);
             wrapper.eq(year != null, Movie::getYear, year)
                     .like(region != null, Movie::getRegion, region);
             wrapper.in(taggedContentIds != null, Movie::getId, taggedContentIds);
@@ -298,7 +300,11 @@ public class SearchController {
                         toDouble(m.getScoreDouban()), toDouble(m.getScoreImdb()), toDouble(m.getScoreRt()),
                         m.getStoryline(), m.getDirector(), m.getActor(),
                         m.getGenre(), m.getRegion(), m.getDuration(), null, m.getAlias(),
-                        toTimestamp(m.getUpdatedAt())));
+                        toTimestamp(m.getUpdatedAt()), m.getWriter(), m.getDirector(), m.getActor(),
+                        m.getReleaseDate(), matchedFields(kw, m.getTitle(), m.getAlias(), m.getWriter(),
+                                m.getDirector(), m.getActor(), m.getGenre(), m.getYear()),
+                        m.getScoreDoubanCount(), m.getScoreImdbCount(), m.getScoreRtCriticCount(),
+                        m.getScoreRtAudienceCount()));
             }
             return total;
         } catch (Exception e) {
@@ -314,7 +320,7 @@ public class SearchController {
             LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<Drama>()
                     .eq(Drama::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.DRAMA, kw, Drama::getTitle, Drama::getAlias,
-                    Drama::getActor, Drama::getDirector, Drama::getGenre, Drama::getYear);
+                    Drama::getWriter, Drama::getActor, Drama::getDirector, Drama::getGenre, Drama::getYear);
             wrapper.eq(year != null, Drama::getYear, year)
                     .like(region != null, Drama::getRegion, region);
             wrapper.in(taggedContentIds != null, Drama::getId, taggedContentIds);
@@ -337,7 +343,10 @@ public class SearchController {
                         toDouble(d.getScoreDouban()), toDouble(d.getScoreImdb()), null,
                         d.getStoryline(), d.getDirector(), d.getActor(),
                         d.getGenre(), d.getRegion(), d.getDuration(), d.getTotalEpisode(), d.getAlias(),
-                        toTimestamp(d.getUpdatedAt())));
+                        toTimestamp(d.getUpdatedAt()), d.getWriter(), d.getDirector(), d.getActor(),
+                        d.getReleaseDate(), matchedFields(kw, d.getTitle(), d.getAlias(), d.getWriter(),
+                                d.getDirector(), d.getActor(), d.getGenre(), d.getYear()),
+                        d.getScoreDoubanCount(), d.getScoreImdbCount(), null, null));
             }
             return total;
         } catch (Exception e) {
@@ -353,7 +362,7 @@ public class SearchController {
             LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<Variety>()
                     .eq(Variety::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.VARIETY, kw, Variety::getTitle, Variety::getAlias,
-                    Variety::getActor, Variety::getDirector, Variety::getGenre, Variety::getYear);
+                    Variety::getWriter, Variety::getActor, Variety::getDirector, Variety::getGenre, Variety::getYear);
             wrapper.eq(year != null, Variety::getYear, year)
                     .like(region != null, Variety::getRegion, region);
             wrapper.in(taggedContentIds != null, Variety::getId, taggedContentIds);
@@ -376,7 +385,10 @@ public class SearchController {
                         toDouble(v.getScoreDouban()), toDouble(v.getScoreImdb()), null,
                         v.getStoryline(), v.getDirector(), v.getActor(),
                         v.getGenre(), v.getRegion(), v.getDuration(), v.getTotalEpisode(), v.getAlias(),
-                        toTimestamp(v.getUpdatedAt())));
+                        toTimestamp(v.getUpdatedAt()), v.getWriter(), v.getDirector(), v.getActor(),
+                        v.getReleaseDate(), matchedFields(kw, v.getTitle(), v.getAlias(), v.getWriter(),
+                                v.getDirector(), v.getActor(), v.getGenre(), v.getYear()),
+                        v.getScoreDoubanCount(), v.getScoreImdbCount(), null, null));
             }
             return total;
         } catch (Exception e) {
@@ -392,7 +404,7 @@ public class SearchController {
             LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<Anime>()
                     .eq(Anime::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.ANIME, kw, Anime::getTitle, Anime::getAlias,
-                    Anime::getActor, Anime::getDirector, Anime::getGenre, Anime::getYear);
+                    Anime::getWriter, Anime::getActor, Anime::getDirector, Anime::getGenre, Anime::getYear);
             wrapper.eq(year != null, Anime::getYear, year)
                     .like(region != null, Anime::getRegion, region);
             wrapper.in(taggedContentIds != null, Anime::getId, taggedContentIds);
@@ -415,7 +427,10 @@ public class SearchController {
                         toDouble(a.getScoreDouban()), toDouble(a.getScoreImdb()), null,
                         a.getStoryline(), a.getDirector(), a.getActor(),
                         a.getGenre(), a.getRegion(), a.getDuration(), a.getTotalEpisode(), a.getAlias(),
-                        toTimestamp(a.getUpdatedAt())));
+                        toTimestamp(a.getUpdatedAt()), a.getWriter(), a.getDirector(), a.getActor(),
+                        a.getReleaseDate(), matchedFields(kw, a.getTitle(), a.getAlias(), a.getWriter(),
+                                a.getDirector(), a.getActor(), a.getGenre(), a.getYear()),
+                        a.getScoreDoubanCount(), a.getScoreImdbCount(), null, null));
             }
             return total;
         } catch (Exception e) {
@@ -431,7 +446,8 @@ public class SearchController {
             LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<ShortDrama>()
                     .eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code());
             applyKeyword(wrapper, ContentType.SHORT_DRAMA, kw, ShortDrama::getTitle, ShortDrama::getAlias,
-                    ShortDrama::getActor, ShortDrama::getDirector, ShortDrama::getGenre, ShortDrama::getYear);
+                    ShortDrama::getWriter, ShortDrama::getActor, ShortDrama::getDirector, ShortDrama::getGenre,
+                    ShortDrama::getYear);
             wrapper.eq(year != null, ShortDrama::getYear, year)
                     .like(region != null, ShortDrama::getRegion, region);
             wrapper.in(taggedContentIds != null, ShortDrama::getId, taggedContentIds);
@@ -454,7 +470,10 @@ public class SearchController {
                         toDouble(s.getScoreDouban()), toDouble(s.getScoreImdb()), null,
                         s.getStoryline(), s.getDirector(), s.getActor(),
                         s.getGenre(), s.getRegion(), s.getDuration(), s.getTotalEpisode(), s.getAlias(),
-                        toTimestamp(s.getUpdatedAt())));
+                        toTimestamp(s.getUpdatedAt()), s.getWriter(), s.getDirector(), s.getActor(),
+                        s.getReleaseDate(), matchedFields(kw, s.getTitle(), s.getAlias(), s.getWriter(),
+                                s.getDirector(), s.getActor(), s.getGenre(), s.getYear()),
+                        s.getScoreDoubanCount(), s.getScoreImdbCount(), null, null));
             }
             return total;
         } catch (Exception e) {
@@ -504,6 +523,7 @@ public class SearchController {
             String keyword,
             SFunction<T, ?> title,
             SFunction<T, ?> alias,
+            SFunction<T, ?> writer,
             SFunction<T, ?> actor,
             SFunction<T, ?> director,
             SFunction<T, ?> genre,
@@ -515,6 +535,7 @@ public class SearchController {
         wrapper.and(search -> {
             search.like(title, keyword)
                     .or().like(alias, keyword)
+                    .or().like(writer, keyword)
                     .or().like(actor, keyword)
                     .or().like(director, keyword)
                     .or().like(genre, keyword);
@@ -688,6 +709,7 @@ public class SearchController {
         if (title.contains(normalized)) return 700;
         if (containsIgnoreCase(result.alias, normalized)) return 600;
         if (containsIgnoreCase(result.genre, normalized)) return 500;
+        if (containsIgnoreCase(result.writers, normalized)) return 400;
         if (containsIgnoreCase(result.actor, normalized)) return 400;
         if (containsIgnoreCase(result.director, normalized)) return 400;
         if (result.year != null && String.valueOf(result.year).equals(normalized)) return 300;
@@ -704,6 +726,21 @@ public class SearchController {
 
     private static String normalizeSearchValue(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    static List<String> matchedFields(String keyword, String title, String alias, String writer,
+                                      String director, String actor, String genre, Integer year) {
+        String normalized = normalizeSearchValue(keyword);
+        if (normalized.isBlank()) return List.of();
+        List<String> fields = new ArrayList<>();
+        if (normalizeSearchValue(title).contains(normalized)) fields.add("title");
+        if (containsIgnoreCase(alias, normalized)) fields.add("alias");
+        if (containsIgnoreCase(writer, normalized)) fields.add("writer");
+        if (containsIgnoreCase(director, normalized)) fields.add("director");
+        if (containsIgnoreCase(actor, normalized)) fields.add("actor");
+        if (containsIgnoreCase(genre, normalized)) fields.add("genre");
+        if (year != null && String.valueOf(year).equals(normalized)) fields.add("year");
+        return List.copyOf(fields);
     }
 
     // ==================== 内部数据结构 ====================
@@ -726,7 +763,25 @@ public class SearchController {
             Integer duration,      // 时长（分钟）
             Integer totalEpisode,  // 总集数
             String alias,          // 别名（JSON数组字符串）
-            Long updatedAtMs       // 更新时间戳（毫秒）
-    ) {}
+            Long updatedAtMs,      // 更新时间戳（毫秒）
+            String writers,        // 编剧（JSON数组字符串）
+            String directors,      // 导演（JSON数组字符串）
+            String actors,         // 演员（JSON数组字符串）
+            String releaseDate,    // 上映/首播日期
+            List<String> matchedFields,
+            Integer scoreDoubanCount,
+            Integer scoreImdbCount,
+            Integer scoreRtCriticCount,
+            Integer scoreRtAudienceCount
+    ) {
+        public SearchResult(Long id, String type, String title, String cover, Integer year,
+                            Double rating, Double ratingImdb, Double ratingRT, String summary,
+                            String director, String actor, String genre, String region, Integer duration,
+                            Integer totalEpisode, String alias, Long updatedAtMs) {
+            this(id, type, title, cover, year, rating, ratingImdb, ratingRT, summary, director, actor,
+                    genre, region, duration, totalEpisode, alias, updatedAtMs, null, director, actor,
+                    null, List.of(), null, null, null, null);
+        }
+    }
 
 }

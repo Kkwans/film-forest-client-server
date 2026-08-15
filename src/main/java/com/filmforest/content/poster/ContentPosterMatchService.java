@@ -55,6 +55,8 @@ public class ContentPosterMatchService {
         entity.setSourcePosterUrl(sourcePosterUrl);
         entity.setTmdbMediaType(result.candidate() == null ? null : result.candidate().mediaType().apiValue());
         entity.setTmdbId(result.candidate() == null ? null : result.candidate().id());
+        entity.setTmdbScore(result.tmdbScore());
+        entity.setTmdbVoteCount(result.tmdbVoteCount());
         entity.setPosterPath(result.poster() == null ? null : result.poster().filePath());
         entity.setPosterLanguage(result.poster() == null ? null : result.poster().language());
         entity.setConfidence(scale(result.confidence()));
@@ -76,6 +78,8 @@ public class ContentPosterMatchService {
         entity.setSourcePosterUrl(sourcePosterUrl);
         entity.setTmdbMediaType(null);
         entity.setTmdbId(null);
+        entity.setTmdbScore(null);
+        entity.setTmdbVoteCount(null);
         entity.setPosterPath(null);
         entity.setPosterLanguage(null);
         entity.setConfidence(null);

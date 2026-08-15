@@ -26,6 +26,11 @@ public interface MovieService extends IService<Movie> {
     IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                            Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir);
 
+    /** 与旧分页契约兼容的语言筛选扩展。 */
+    IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                          Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                          String language);
+
     /**
      * 获取电影详情（含在线资源和播放源）
      * @param id 电影ID

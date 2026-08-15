@@ -74,6 +74,39 @@ class PublicContentVisibilityServiceTest {
     }
 
     @Test
+    void everyPublicCollectionSupportsLanguageFilter() {
+        MovieMapper movieMapper = mock(MovieMapper.class);
+        initialize(Movie.class);
+        MovieServiceImpl movies = attach(new MovieServiceImpl(tags, resources), movieMapper);
+        assertLanguagePage(movieMapper, () -> movies.pageList(1, 20, null, null, null, null,
+                null, null, null, null, "desc", "zh-CN"));
+
+        DramaMapper dramaMapper = mock(DramaMapper.class);
+        initialize(Drama.class);
+        DramaServiceImpl dramas = attach(new DramaServiceImpl(tags, resources), dramaMapper);
+        assertLanguagePage(dramaMapper, () -> dramas.pageList(1, 20, null, null, null, null,
+                null, null, null, null, "desc", "zh-CN"));
+
+        VarietyMapper varietyMapper = mock(VarietyMapper.class);
+        initialize(Variety.class);
+        VarietyServiceImpl varieties = attach(new VarietyServiceImpl(tags, resources), varietyMapper);
+        assertLanguagePage(varietyMapper, () -> varieties.pageList(1, 20, null, null, null, null,
+                null, null, null, null, "desc", "zh-CN"));
+
+        AnimeMapper animeMapper = mock(AnimeMapper.class);
+        initialize(Anime.class);
+        AnimeServiceImpl animes = attach(new AnimeServiceImpl(tags, resources), animeMapper);
+        assertLanguagePage(animeMapper, () -> animes.pageList(1, 20, null, null, null, null,
+                null, null, null, null, "desc", "zh-CN"));
+
+        ShortDramaMapper shortDramaMapper = mock(ShortDramaMapper.class);
+        initialize(ShortDrama.class);
+        ShortDramaServiceImpl shortDramas = attach(new ShortDramaServiceImpl(tags, resources), shortDramaMapper);
+        assertLanguagePage(shortDramaMapper, () -> shortDramas.pageList(1, 20, null, null, null, null,
+                null, null, null, null, "desc", "zh-CN"));
+    }
+
+    @Test
     void everyPublicDetailFiltersPublishedContent() {
         MovieMapper movieMapper = mock(MovieMapper.class);
         initialize(Movie.class);
@@ -138,5 +171,19 @@ class PublicContentVisibilityServiceTest {
         assertThat(wrapper.getValue().getSqlSegment()).contains("id", "status");
         assertThat(((AbstractWrapper<?, ?, ?>) wrapper.getValue()).getParamNameValuePairs())
                 .containsValues(7L, ContentStatus.PUBLISHED.code());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private <T> void assertLanguagePage(BaseMapper<T> mapper, Runnable query) {
+        doAnswer(invocation -> invocation.getArgument(0))
+                .when(mapper).selectPage(any(IPage.class), any(Wrapper.class));
+
+        query.run();
+
+        ArgumentCaptor<Wrapper<T>> wrapper = (ArgumentCaptor) ArgumentCaptor.forClass(Wrapper.class);
+        verify(mapper).selectPage(any(IPage.class), wrapper.capture());
+        assertThat(wrapper.getValue().getSqlSegment()).contains("language");
+        assertThat(((AbstractWrapper<?, ?, ?>) wrapper.getValue()).getParamNameValuePairs())
+                .containsValue("%zh-CN%");
     }
 }

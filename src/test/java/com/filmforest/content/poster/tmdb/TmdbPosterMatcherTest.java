@@ -48,6 +48,22 @@ class TmdbPosterMatcherTest {
     }
 
     @Test
+    void acceptedMatchMapsTmdbVotesAndKeepsCandidatePosterFallback() {
+        FakeGateway gateway = new FakeGateway();
+        gateway.candidates = List.of(new SearchCandidate(303, MediaType.MOVIE,
+                "示例电影", "Example Movie", 2024, "/candidate.jpg", 8.7, 1234));
+        gateway.posters = List.of();
+
+        MatchResult result = new TmdbPosterMatcher(gateway).match(
+                new MatchRequest(ContentType.MOVIE, "示例电影", List.of(), 2024), CREDENTIAL);
+
+        assertThat(result.status()).isEqualTo(Status.ACCEPTED);
+        assertThat(result.tmdbScore()).isEqualByComparingTo("8.7");
+        assertThat(result.tmdbVoteCount()).isEqualTo(1234);
+        assertThat(result.posterUrl()).isEqualTo("https://image.tmdb.org/t/p/w500/candidate.jpg");
+    }
+
+    @Test
     void credentialStringNeverEchoesSecret() {
         Credential credential = new Credential(CredentialType.READ_ACCESS_TOKEN, "do-not-print-this");
 

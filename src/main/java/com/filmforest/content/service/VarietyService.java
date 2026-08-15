@@ -26,6 +26,10 @@ public interface VarietyService extends IService<Variety> {
     IPage<Variety> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                              Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir);
 
+    IPage<Variety> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                            Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                            String language);
+
     /**
      * 获取综艺详情（含在线资源和播放源）
      * @param id 综艺ID

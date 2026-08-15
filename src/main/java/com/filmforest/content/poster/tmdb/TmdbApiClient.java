@@ -56,7 +56,8 @@ public class TmdbApiClient implements Gateway {
             String originalTitle = text(item, mediaType == MediaType.MOVIE ? "original_title" : "original_name");
             String date = text(item, mediaType == MediaType.MOVIE ? "release_date" : "first_air_date");
             candidates.add(new SearchCandidate(item.path("id").asLong(), mediaType, title, originalTitle,
-                    year(date), text(item, "poster_path")));
+                    year(date), text(item, "poster_path"), number(item, "vote_average"),
+                    integer(item, "vote_count")));
         }
         return List.copyOf(candidates);
     }
@@ -140,6 +141,16 @@ public class TmdbApiClient implements Gateway {
     private static String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return value == null || value.isNull() || value.asText().isBlank() ? null : value.asText();
+    }
+
+    private static Double number(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value == null || value.isNull() || !value.isNumber() ? null : value.asDouble();
+    }
+
+    private static Integer integer(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value == null || value.isNull() || !value.isIntegralNumber() ? null : value.asInt();
     }
 
     private static Integer year(String date) {

@@ -54,6 +54,20 @@ class SearchControllerContractTest {
     }
 
     @Test
+    void matchedFieldsExposeAliasWriterPeopleGenreAndYearMatches() {
+        assertThat(SearchController.matchedFields("别名", "标题", "[\"别名\"]", null,
+                null, null, null, 2024)).containsExactly("alias");
+        assertThat(SearchController.matchedFields("编剧", "标题", null, "[\"编剧\"]",
+                null, null, null, 2024)).containsExactly("writer");
+        assertThat(SearchController.matchedFields("导演", "标题", null, null,
+                "[\"导演\"]", null, null, 2024)).containsExactly("director");
+        assertThat(SearchController.matchedFields("演员", "标题", null, null,
+                null, "[\"演员\"]", null, 2024)).containsExactly("actor");
+        assertThat(SearchController.matchedFields("2024", "标题", null, null,
+                null, null, "[\"剧情\"]", 2024)).containsExactly("year");
+    }
+
+    @Test
     void relevancePrefersExactTitleThenAliasAndGenre() {
         SearchController.SearchResult exact = result("史努比", null, null);
         SearchController.SearchResult alias = result("欢迎回家", "[\"史努比\"]", null);

@@ -21,6 +21,7 @@ public class UserMovieListItem {
 
     private BigDecimal rating;           // 评分(10分制)
     private String note;                 // 备注/感受
+    private LocalDateTime watchedAt;     // 首次进入看过片单的时间
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime addedAt;

@@ -32,6 +32,14 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
     @Override
     public IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                                   Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
+        return pageList(pageNum, pageSize, year, region, genre, sort, yearFrom, yearTo, tagId,
+                hasResource, sortDir, null);
+    }
+
+    @Override
+    public IPage<Drama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                 Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                                 String language) {
         LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Drama::getStatus, ContentStatus.PUBLISHED.code());
 
@@ -44,6 +52,7 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
 
         wrapper.like(StringUtils.isNotBlank(region), Drama::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Drama::getGenre, genre);
+        wrapper.like(StringUtils.isNotBlank(language), Drama::getLanguage, language);
         contentTagLookupService.apply(wrapper, Drama::getId, tagId, ContentType.DRAMA);
         contentResourceFilter.apply(wrapper, ContentType.DRAMA, hasResource);
 

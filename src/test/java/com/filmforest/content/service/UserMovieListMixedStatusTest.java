@@ -10,8 +10,11 @@ import com.filmforest.content.entity.Movie;
 import com.filmforest.content.entity.ShortDrama;
 import com.filmforest.content.mapper.MovieMapper;
 import com.filmforest.content.mapper.ShortDramaMapper;
+import com.filmforest.content.mapper.AnimeMapper;
+import com.filmforest.content.mapper.DramaMapper;
 import com.filmforest.content.mapper.UserMovieListItemMapper;
 import com.filmforest.content.mapper.UserMovieListMapper;
+import com.filmforest.content.mapper.VarietyMapper;
 import com.filmforest.content.service.impl.UserMovieListServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +36,10 @@ class UserMovieListMixedStatusTest {
     @Mock private UserMovieListItemMapper itemMapper;
     @Mock private MovieMapper movieMapper;
     @Mock private ShortDramaMapper shortDramaMapper;
+    @Mock private DramaMapper dramaMapper;
+    @Mock private VarietyMapper varietyMapper;
+    @Mock private AnimeMapper animeMapper;
+    @Mock private PublishedContentAccessService publishedContentAccessService;
     private UserMovieListServiceImpl service;
 
     @BeforeEach
@@ -47,11 +54,9 @@ class UserMovieListMixedStatusTest {
         TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-short-test"),
                 ShortDrama.class);
-        service = new UserMovieListServiceImpl();
+        service = new UserMovieListServiceImpl(itemMapper, movieMapper, dramaMapper, varietyMapper,
+                animeMapper, shortDramaMapper, publishedContentAccessService);
         ReflectionTestUtils.setField(service, "baseMapper", listMapper);
-        ReflectionTestUtils.setField(service, "itemMapper", itemMapper);
-        ReflectionTestUtils.setField(service, "movieMapper", movieMapper);
-        ReflectionTestUtils.setField(service, "shortDramaMapper", shortDramaMapper);
     }
 
     @Test

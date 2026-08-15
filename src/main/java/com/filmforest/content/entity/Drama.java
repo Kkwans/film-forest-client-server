@@ -33,7 +33,13 @@ public class Drama {
     private Integer totalEpisode;
     private String storyline;
     private BigDecimal scoreDouban;
+    private Integer scoreDoubanCount;
     private BigDecimal scoreImdb;
+    private Integer scoreImdbCount;
+    @TableField(exist = false)
+    private BigDecimal tmdbScore;
+    @TableField(exist = false)
+    private Integer tmdbVoteCount;
     private Integer status;
 
     @TableField(fill = FieldFill.INSERT)

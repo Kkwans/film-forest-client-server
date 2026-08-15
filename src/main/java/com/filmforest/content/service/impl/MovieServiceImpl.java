@@ -32,6 +32,14 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
     @Override
     public IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                                   Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
+        return pageList(pageNum, pageSize, year, region, genre, sort, yearFrom, yearTo, tagId,
+                hasResource, sortDir, null);
+    }
+
+    @Override
+    public IPage<Movie> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                 Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                                 String language) {
         Page<Movie> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Movie::getStatus, ContentStatus.PUBLISHED.code());
@@ -49,6 +57,7 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
 
         // 类型筛选（模糊匹配 JSON 字符串）
         wrapper.like(StringUtils.isNotBlank(genre), Movie::getGenre, genre);
+        wrapper.like(StringUtils.isNotBlank(language), Movie::getLanguage, language);
         contentTagLookupService.apply(wrapper, Movie::getId, tagId, ContentType.MOVIE);
         contentResourceFilter.apply(wrapper, ContentType.MOVIE, hasResource);
 

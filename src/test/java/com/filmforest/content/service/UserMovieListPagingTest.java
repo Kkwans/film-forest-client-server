@@ -7,8 +7,14 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.entity.UserMovieListItem;
+import com.filmforest.content.mapper.AnimeMapper;
+import com.filmforest.content.mapper.DramaMapper;
+import com.filmforest.content.mapper.MovieMapper;
+import com.filmforest.content.mapper.ShortDramaMapper;
+import com.filmforest.content.mapper.VarietyMapper;
 import com.filmforest.content.mapper.UserMovieListItemMapper;
 import com.filmforest.content.mapper.UserMovieListMapper;
+import com.filmforest.content.service.PublishedContentAccessService;
 import com.filmforest.content.service.impl.UserMovieListServiceImpl;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +36,12 @@ class UserMovieListPagingTest {
 
     @Mock private UserMovieListMapper listMapper;
     @Mock private UserMovieListItemMapper itemMapper;
+    @Mock private MovieMapper movieMapper;
+    @Mock private DramaMapper dramaMapper;
+    @Mock private VarietyMapper varietyMapper;
+    @Mock private AnimeMapper animeMapper;
+    @Mock private ShortDramaMapper shortDramaMapper;
+    @Mock private PublishedContentAccessService publishedContentAccessService;
     private UserMovieListServiceImpl service;
 
     @BeforeEach
@@ -38,9 +50,9 @@ class UserMovieListPagingTest {
         TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), "user-list-paging-test"),
                 UserMovieListItem.class);
-        service = new UserMovieListServiceImpl();
+        service = new UserMovieListServiceImpl(itemMapper, movieMapper, dramaMapper, varietyMapper,
+                animeMapper, shortDramaMapper, publishedContentAccessService);
         ReflectionTestUtils.setField(service, "baseMapper", listMapper);
-        ReflectionTestUtils.setField(service, "itemMapper", itemMapper);
 
         UserMovieList list = new UserMovieList();
         list.setId(9L);

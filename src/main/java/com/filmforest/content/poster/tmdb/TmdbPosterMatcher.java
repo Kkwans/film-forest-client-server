@@ -191,7 +191,12 @@ public class TmdbPosterMatcher {
     }
 
     public record SearchCandidate(long id, MediaType mediaType, String title, String originalTitle,
-                                  Integer year, String posterPath) { }
+                                  Integer year, String posterPath, Double voteAverage, Integer voteCount) {
+        public SearchCandidate(long id, MediaType mediaType, String title, String originalTitle,
+                               Integer year, String posterPath) {
+            this(id, mediaType, title, originalTitle, year, posterPath, null, null);
+        }
+    }
 
     public record PosterAsset(String filePath, String language, double voteAverage, int voteCount) { }
 
@@ -215,6 +220,17 @@ public class TmdbPosterMatcher {
                               Map<String, Object> diagnostics) {
         public String posterUrl() {
             return poster == null || imageConfiguration == null ? null : imageConfiguration.imageUrl(poster.filePath());
+        }
+
+        /** TMDB content vote_average, never the poster image vote fields. */
+        public BigDecimal tmdbScore() {
+            if (candidate == null || candidate.voteAverage() == null) return null;
+            return BigDecimal.valueOf(candidate.voteAverage()).setScale(1, RoundingMode.HALF_UP);
+        }
+
+        /** TMDB content vote_count, never inferred from another rating source. */
+        public Integer tmdbVoteCount() {
+            return candidate == null ? null : candidate.voteCount();
         }
     }
 

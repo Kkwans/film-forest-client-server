@@ -33,7 +33,13 @@ public class Anime {
     private Integer totalEpisode;
     private String storyline;
     private BigDecimal scoreDouban;
+    private Integer scoreDoubanCount;
     private BigDecimal scoreImdb;           // IMDB评分
+    private Integer scoreImdbCount;
+    @TableField(exist = false)
+    private BigDecimal tmdbScore;
+    @TableField(exist = false)
+    private Integer tmdbVoteCount;
     private Integer status;
 
     @TableField(fill = FieldFill.INSERT)

@@ -31,8 +31,16 @@ public class Movie {
     private Integer duration;               // 时长（分钟）
     private String storyline;              // 剧情简介
     private BigDecimal scoreDouban;        // 豆瓣评分
+    private Integer scoreDoubanCount;      // 豆瓣评分人数
     private BigDecimal scoreImdb;          // IMDb评分
+    private Integer scoreImdbCount;        // IMDb评分人数
     private BigDecimal scoreRt;            // 烂番茄评分(%)
+    private Integer scoreRtCriticCount;    // 烂番茄影评人评价数
+    private Integer scoreRtAudienceCount;  // 烂番茄观众评价数
+    @TableField(exist = false)
+    private BigDecimal tmdbScore;          // TMDB 社区评分（匹配表投影）
+    @TableField(exist = false)
+    private Integer tmdbVoteCount;         // TMDB 社区投票人数（匹配表投影）
     private String seriesName;             // 系列名称
     private Integer seriesOrder;           // 系列序号
     private Integer status;                 // 状态：0=未上线 1=已上线（默认1）

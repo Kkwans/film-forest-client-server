@@ -14,12 +14,14 @@ import com.filmforest.content.service.PublishedContentAccessService;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import com.filmforest.common.exception.BusinessException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,26 +29,29 @@ import java.util.stream.Collectors;
 @Service
 public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, UserMovieList> implements UserMovieListService {
 
-    @Autowired
-    private UserMovieListItemMapper itemMapper;
+    private final UserMovieListItemMapper itemMapper;
+    private final MovieMapper movieMapper;
+    private final DramaMapper dramaMapper;
+    private final VarietyMapper varietyMapper;
+    private final AnimeMapper animeMapper;
+    private final ShortDramaMapper shortDramaMapper;
+    private final PublishedContentAccessService publishedContentAccessService;
 
-    @Autowired
-    private MovieMapper movieMapper;
-
-    @Autowired
-    private DramaMapper dramaMapper;
-
-    @Autowired
-    private VarietyMapper varietyMapper;
-
-    @Autowired
-    private AnimeMapper animeMapper;
-
-    @Autowired
-    private ShortDramaMapper shortDramaMapper;
-
-    @Autowired
-    private PublishedContentAccessService publishedContentAccessService;
+    public UserMovieListServiceImpl(UserMovieListItemMapper itemMapper,
+                                    MovieMapper movieMapper,
+                                    DramaMapper dramaMapper,
+                                    VarietyMapper varietyMapper,
+                                    AnimeMapper animeMapper,
+                                    ShortDramaMapper shortDramaMapper,
+                                    PublishedContentAccessService publishedContentAccessService) {
+        this.itemMapper = itemMapper;
+        this.movieMapper = movieMapper;
+        this.dramaMapper = dramaMapper;
+        this.varietyMapper = varietyMapper;
+        this.animeMapper = animeMapper;
+        this.shortDramaMapper = shortDramaMapper;
+        this.publishedContentAccessService = publishedContentAccessService;
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -163,6 +168,9 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         item.setContentType(normalizedType.code());
         item.setRating(rating);
         item.setNote(normalizedNote);
+        if ("watched".equals(list.getType())) {
+            item.setWatchedAt(LocalDateTime.now(ZoneOffset.UTC));
+        }
 
         try {
             itemMapper.insert(item);
@@ -175,6 +183,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (existing != null) {
                 if (rating != null) existing.setRating(rating);
                 if (note != null) existing.setNote(normalizedNote);
+                // Duplicate adds/editing evaluation must never reset the original watchedAt.
                 itemMapper.updateById(existing);
             }
             // 注意：不在此处 return，继续执行互斥逻辑
@@ -248,7 +257,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             int cmp = 0;
             switch (sort) {
                 case "addedAt":
-                    cmp = Comparator.nullsFirst(Comparator.<java.time.LocalDateTime>naturalOrder())
+                    cmp = Comparator.nullsFirst(Comparator.<OffsetDateTime>naturalOrder())
                             .compare(a.getAddedAt(), b.getAddedAt());
                     break;
                 case "userRating":
@@ -266,7 +275,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                     cmp = Double.compare(da, db);
                     break;
                 default:
-                    cmp = Comparator.nullsFirst(Comparator.<java.time.LocalDateTime>naturalOrder())
+                    cmp = Comparator.nullsFirst(Comparator.<OffsetDateTime>naturalOrder())
                             .compare(a.getAddedAt(), b.getAddedAt());
             }
             return desc ? -cmp : cmp;
@@ -363,7 +372,8 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         vo.setListId(item.getListId());
         vo.setMovieId(item.getMovieId());
         vo.setContentType(item.getContentType());
-        vo.setAddedAt(item.getAddedAt());
+        vo.setAddedAt(toUtcOffset(item.getAddedAt()));
+        vo.setWatchedAt(toUtcOffset(item.getWatchedAt()));
         vo.setUserRating(item.getRating());
         vo.setNote(item.getNote());
 
@@ -386,12 +396,19 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (m != null) {
                 vo.setTitle(m.getTitle());
                 vo.setCover(m.getPosterUrl());
+                vo.setAlias(m.getAlias());
                 vo.setYear(m.getYear());
                 vo.setRating(m.getScoreDouban());
+                vo.setScoreDoubanCount(m.getScoreDoubanCount());
+                vo.setScoreImdbCount(m.getScoreImdbCount());
+                vo.setScoreRtCriticCount(m.getScoreRtCriticCount());
+                vo.setScoreRtAudienceCount(m.getScoreRtAudienceCount());
                 vo.setRegion(m.getRegion());
                 vo.setGenre(m.getGenre());
                 vo.setDirector(m.getDirector());
+                vo.setWriter(m.getWriter());
                 vo.setActor(m.getActor());
+                vo.setReleaseDate(m.getReleaseDate());
                 vo.setDuration(m.getDuration());
             }
         } else if ("drama".equals(ct)) {
@@ -399,12 +416,17 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (d != null) {
                 vo.setTitle(d.getTitle());
                 vo.setCover(d.getPosterUrl());
+                vo.setAlias(d.getAlias());
                 vo.setYear(d.getYear());
                 vo.setRating(d.getScoreDouban());
+                vo.setScoreDoubanCount(d.getScoreDoubanCount());
+                vo.setScoreImdbCount(d.getScoreImdbCount());
                 vo.setRegion(d.getRegion());
                 vo.setGenre(d.getGenre());
                 vo.setDirector(d.getDirector());
+                vo.setWriter(d.getWriter());
                 vo.setActor(d.getActor());
+                vo.setReleaseDate(d.getReleaseDate());
                 vo.setTotalEpisode(d.getTotalEpisode());
             }
         } else if ("variety".equals(ct)) {
@@ -412,12 +434,17 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (v != null) {
                 vo.setTitle(v.getTitle());
                 vo.setCover(v.getPosterUrl());
+                vo.setAlias(v.getAlias());
                 vo.setYear(v.getYear());
                 vo.setRating(v.getScoreDouban());
+                vo.setScoreDoubanCount(v.getScoreDoubanCount());
+                vo.setScoreImdbCount(v.getScoreImdbCount());
                 vo.setRegion(v.getRegion());
                 vo.setGenre(v.getGenre());
                 vo.setDirector(v.getDirector());
+                vo.setWriter(v.getWriter());
                 vo.setActor(v.getActor());
+                vo.setReleaseDate(v.getReleaseDate());
                 vo.setTotalEpisode(v.getTotalEpisode());
             }
         } else if ("anime".equals(ct)) {
@@ -425,12 +452,17 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (a != null) {
                 vo.setTitle(a.getTitle());
                 vo.setCover(a.getPosterUrl());
+                vo.setAlias(a.getAlias());
                 vo.setYear(a.getYear());
                 vo.setRating(a.getScoreDouban());
+                vo.setScoreDoubanCount(a.getScoreDoubanCount());
+                vo.setScoreImdbCount(a.getScoreImdbCount());
                 vo.setRegion(a.getRegion());
                 vo.setGenre(a.getGenre());
                 vo.setDirector(a.getDirector());
+                vo.setWriter(a.getWriter());
                 vo.setActor(a.getActor());
+                vo.setReleaseDate(a.getReleaseDate());
                 vo.setTotalEpisode(a.getTotalEpisode());
             }
         } else if ("short_drama".equals(ct)) {
@@ -438,12 +470,17 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (s != null) {
                 vo.setTitle(s.getTitle());
                 vo.setCover(s.getPosterUrl());
+                vo.setAlias(s.getAlias());
                 vo.setYear(s.getYear());
                 vo.setRating(s.getScoreDouban());
+                vo.setScoreDoubanCount(s.getScoreDoubanCount());
+                vo.setScoreImdbCount(s.getScoreImdbCount());
                 vo.setRegion(s.getRegion());
                 vo.setGenre(s.getGenre());
                 vo.setDirector(s.getDirector());
+                vo.setWriter(s.getWriter());
                 vo.setActor(s.getActor());
+                vo.setReleaseDate(s.getReleaseDate());
                 vo.setDuration(s.getDuration());
                 vo.setTotalEpisode(s.getTotalEpisode());
             }
@@ -527,6 +564,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
                 if (item != null) {
                     map.put("userRating", item.getRating());
                     map.put("note", item.getNote());
+                    map.put("watchedAt", toUtcOffset(item.getWatchedAt()));
                 }
             }
             return map;
@@ -661,6 +699,10 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         ids.forEach(id -> target.add(new ContentKey(type.code(), id)));
     }
 
+    private static OffsetDateTime toUtcOffset(LocalDateTime value) {
+        return value == null ? null : value.atOffset(ZoneOffset.UTC);
+    }
+
     private List<Map<String, Object>> buildStatuses(
             List<UserMovieList> lists,
             Map<Long, UserMovieListItem> itemsByList) {
@@ -674,6 +716,7 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             if (item != null) {
                 status.put("userRating", item.getRating());
                 status.put("note", item.getNote());
+                status.put("watchedAt", toUtcOffset(item.getWatchedAt()));
             }
             return status;
         }).toList();

@@ -26,6 +26,10 @@ public class ContentPosterMatch {
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long tmdbId;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private BigDecimal tmdbScore;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
+    private Integer tmdbVoteCount;
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String posterPath;
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String posterLanguage;

@@ -26,6 +26,10 @@ public interface ShortDramaService extends IService<ShortDrama> {
     IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                                 Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir);
 
+    IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                               Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                               String language);
+
     /**
      * 获取短剧详情（含在线资源和播放源）
      * @param id 短剧ID

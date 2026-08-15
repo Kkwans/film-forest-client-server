@@ -32,6 +32,14 @@ public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDr
     @Override
     public IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                                        Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
+        return pageList(pageNum, pageSize, year, region, genre, sort, yearFrom, yearTo, tagId,
+                hasResource, sortDir, null);
+    }
+
+    @Override
+    public IPage<ShortDrama> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                      Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                                      String language) {
         Page<ShortDrama> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(ShortDrama::getStatus, ContentStatus.PUBLISHED.code());
@@ -45,6 +53,7 @@ public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDr
 
         wrapper.like(StringUtils.isNotBlank(region), ShortDrama::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), ShortDrama::getGenre, genre);
+        wrapper.like(StringUtils.isNotBlank(language), ShortDrama::getLanguage, language);
         contentTagLookupService.apply(wrapper, ShortDrama::getId, tagId, ContentType.SHORT_DRAMA);
         contentResourceFilter.apply(wrapper, ContentType.SHORT_DRAMA, hasResource);
 

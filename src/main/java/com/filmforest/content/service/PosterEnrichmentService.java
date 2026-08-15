@@ -103,12 +103,15 @@ public class PosterEnrichmentService {
                                           ContentPosterMatch match) {
         return new PosterResolutionView(type.code(), id, null, "original",
                 match == null ? "not_attempted" : match.getMatchStatus(), diagnostic,
-                match == null ? null : match.getConfidence(), match == null ? null : match.getMatchedAt());
+                match == null ? null : match.getConfidence(), match == null ? null : match.getMatchedAt(),
+                match == null ? null : match.getTmdbScore(),
+                match == null ? null : match.getTmdbVoteCount());
     }
 
     private PosterResolutionView fromMatch(ContentPosterMatch match, String posterUrl, String source,
                                            String diagnostic) {
         return new PosterResolutionView(match.getContentType(), match.getContentId(), posterUrl, source,
-                match.getMatchStatus(), diagnostic, match.getConfidence(), match.getMatchedAt());
+                match.getMatchStatus(), diagnostic, match.getConfidence(), match.getMatchedAt(),
+                match.getTmdbScore(), match.getTmdbVoteCount());
     }
 }

@@ -23,6 +23,7 @@ public class ShortDrama {
     private String posterUrl;
     private Integer year;
     private String director;
+    private String writer;
     private String actor;
     private String genre;
     private String region;
@@ -32,7 +33,13 @@ public class ShortDrama {
     private Integer duration;
     private String storyline;
     private BigDecimal scoreDouban;         // 豆瓣评分
+    private Integer scoreDoubanCount;
     private BigDecimal scoreImdb;           // IMDB评分
+    private Integer scoreImdbCount;
+    @TableField(exist = false)
+    private BigDecimal tmdbScore;
+    @TableField(exist = false)
+    private Integer tmdbVoteCount;
     private Integer status;
 
     @TableField(fill = FieldFill.INSERT)

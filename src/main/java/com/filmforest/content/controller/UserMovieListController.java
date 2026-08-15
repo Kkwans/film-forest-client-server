@@ -10,7 +10,6 @@ import com.filmforest.content.service.UserMovieListService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -25,8 +24,11 @@ import java.util.Map;
 @RequestMapping("/api/user")
 public class UserMovieListController {
 
-    @Autowired
-    private UserMovieListService userMovieListService;
+    private final UserMovieListService userMovieListService;
+
+    public UserMovieListController(UserMovieListService userMovieListService) {
+        this.userMovieListService = userMovieListService;
+    }
 
     /**
      * 获取当前用户所有片单
@@ -105,22 +107,18 @@ public class UserMovieListController {
     public Result<?> addItem(HttpServletRequest request, @PathVariable Long id,
                              @RequestBody Map<String, Object> params) {
         Long userId = (Long) request.getAttribute("userId");
-        Long movieId = params.get("movieId") != null ? Long.valueOf(params.get("movieId").toString()) : null;
-        String contentType = (String) params.get("contentType");
+        Long movieId = parseId(params.get("movieId"));
+        String contentType = parseString(params.get("contentType"));
 
         if (movieId == null || contentType == null || contentType.isBlank()) {
             log.warn("[UserList] 添加影视失败: 参数不完整, userId={}, listId={}", userId, id);
             return Result.fail(400, "movieId 和 contentType 不能为空");
         }
 
-        // 可选参数：评分和备注
-        BigDecimal rating = null;
-        if (params.get("rating") != null) {
-            rating = new BigDecimal(params.get("rating").toString());
-        }
-        String note = (String) params.get("note");
-
         try {
+            // 可选参数：评分和备注；格式错误也通过既有 400 响应返回。
+            BigDecimal rating = parseRating(params.get("rating"));
+            String note = parseNote(params.get("note"));
             userMovieListService.addItem(userId, id, movieId, contentType, rating, note);
             log.info("[UserList] 添加影视到片单: userId={}, listId={}, movieId={}, contentType={}", userId, id, movieId, contentType);
             return Result.ok();
@@ -137,8 +135,8 @@ public class UserMovieListController {
     public Result<?> removeItem(HttpServletRequest request, @PathVariable Long id,
                                 @RequestBody Map<String, Object> params) {
         Long userId = (Long) request.getAttribute("userId");
-        Long movieId = params.get("movieId") != null ? Long.valueOf(params.get("movieId").toString()) : null;
-        String contentType = (String) params.get("contentType");
+        Long movieId = parseId(params.get("movieId"));
+        String contentType = parseString(params.get("contentType"));
 
         if (movieId == null || contentType == null || contentType.isBlank()) {
             log.warn("[UserList] 移除影视失败: 参数不完整, userId={}, listId={}", userId, id);
@@ -189,21 +187,17 @@ public class UserMovieListController {
     public Result<?> updateItem(HttpServletRequest request, @PathVariable Long id,
                                 @RequestBody Map<String, Object> params) {
         Long userId = (Long) request.getAttribute("userId");
-        Long movieId = params.get("movieId") != null ? Long.valueOf(params.get("movieId").toString()) : null;
-        String contentType = (String) params.get("contentType");
+        Long movieId = parseId(params.get("movieId"));
+        String contentType = parseString(params.get("contentType"));
 
         if (movieId == null || contentType == null || contentType.isBlank()) {
             log.warn("[UserList] 更新条目失败: 参数不完整, userId={}, listId={}", userId, id);
             return Result.fail(400, "movieId 和 contentType 不能为空");
         }
 
-        java.math.BigDecimal rating = null;
-        if (params.get("rating") != null) {
-            rating = new java.math.BigDecimal(params.get("rating").toString());
-        }
-        String note = (String) params.get("note");
-
         try {
+            BigDecimal rating = parseRating(params.get("rating"));
+            String note = parseNote(params.get("note"));
             userMovieListService.updateItem(userId, id, movieId, contentType, rating, note);
             log.info("[UserList] 更新片单条目: userId={}, listId={}, movieId={}, contentType={}", userId, id, movieId, contentType);
             return Result.ok();
@@ -277,5 +271,42 @@ public class UserMovieListController {
         log.debug("[UserList] 混合批量状态: userId={}, queryCount={}, resultCount={}",
                 userId, queries.size(), result.size());
         return Result.ok(result);
+    }
+
+    private Long parseId(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            long value = Long.parseLong(raw.toString());
+            return value > 0 ? value : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String parseString(Object raw) {
+        return raw instanceof String ? (String) raw : null;
+    }
+
+    private BigDecimal parseRating(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        try {
+            return new BigDecimal(raw.toString());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("rating 格式无效");
+        }
+    }
+
+    private String parseNote(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        if (!(raw instanceof String)) {
+            throw new IllegalArgumentException("note 格式无效");
+        }
+        return (String) raw;
     }
 }

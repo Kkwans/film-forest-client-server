@@ -32,6 +32,14 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
     @Override
     public IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
                                   Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir) {
+        return pageList(pageNum, pageSize, year, region, genre, sort, yearFrom, yearTo, tagId,
+                hasResource, sortDir, null);
+    }
+
+    @Override
+    public IPage<Anime> pageList(int pageNum, int pageSize, Integer year, String region, String genre, String sort,
+                                 Integer yearFrom, Integer yearTo, Long tagId, Boolean hasResource, String sortDir,
+                                 String language) {
         Page<Anime> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Anime::getStatus, ContentStatus.PUBLISHED.code());
@@ -45,6 +53,7 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
 
         wrapper.like(StringUtils.isNotBlank(region), Anime::getRegion, region);
         wrapper.like(StringUtils.isNotBlank(genre), Anime::getGenre, genre);
+        wrapper.like(StringUtils.isNotBlank(language), Anime::getLanguage, language);
         contentTagLookupService.apply(wrapper, Anime::getId, tagId, ContentType.ANIME);
         contentResourceFilter.apply(wrapper, ContentType.ANIME, hasResource);
 

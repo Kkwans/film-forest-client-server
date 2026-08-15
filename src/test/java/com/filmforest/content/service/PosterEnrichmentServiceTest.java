@@ -7,6 +7,7 @@ import com.filmforest.content.poster.ContentPosterMatchService;
 import com.filmforest.content.poster.PosterContentLoader;
 import com.filmforest.content.poster.PosterContentLoader.ContentSnapshot;
 import com.filmforest.content.poster.tmdb.TmdbPosterMatcher;
+import com.filmforest.content.poster.tmdb.TmdbApiClient.TmdbApiException;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -56,8 +57,38 @@ class PosterEnrichmentServiceTest {
 
         assertThat(result.source()).isEqualTo("tmdb");
         assertThat(result.posterUrl()).endsWith("/poster.jpg");
+        accepted.setTmdbScore(new java.math.BigDecimal("8.4"));
+        accepted.setTmdbVoteCount(321);
+        var scoreResult = service.enrich(7L, "movie", 8L);
+        assertThat(scoreResult.tmdbScore()).isEqualByComparingTo("8.4");
+        assertThat(scoreResult.tmdbVoteCount()).isEqualTo(321);
         verify(settingService, never()).requireCredential(7L);
         verifyNoInteractions(matcher);
+    }
+
+    @Test
+    void externalFailureReturnsOriginalPosterAndPersistsNoSourceScore() {
+        when(contentLoader.load(ContentType.MOVIE, 8L)).thenReturn(content());
+        when(settingService.get(7L)).thenReturn(setting("tmdb", true));
+        when(matchService.find(ContentType.MOVIE, 8L)).thenReturn(null);
+        when(settingService.requireCredential(7L))
+                .thenReturn(new UserPosterSettingService.DecryptedCredential("api_key", "test-credential"));
+        when(matcher.match(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenThrow(new TmdbApiException("network_error", 0));
+        ContentPosterMatch error = new ContentPosterMatch();
+        error.setMatchStatus("error");
+        when(matchService.saveError(ContentType.MOVIE, 8L, "https://source.example/poster.jpg",
+                "network_error", 0)).thenReturn(error);
+
+        var result = service.enrich(7L, "movie", 8L);
+
+        assertThat(result.source()).isEqualTo("original");
+        assertThat(result.posterUrl()).isNull();
+        assertThat(result.diagnosticCode()).isEqualTo("network_error");
+        assertThat(result.tmdbScore()).isNull();
+        assertThat(result.tmdbVoteCount()).isNull();
+        verify(matchService).saveError(ContentType.MOVIE, 8L, "https://source.example/poster.jpg",
+                "network_error", 0);
     }
 
     private PosterSettingView setting(String source, boolean configured) {
