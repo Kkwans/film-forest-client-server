@@ -61,8 +61,15 @@ class SearchControllerContractTest {
 
         assertThat(SearchController.normalizeSort(null)).isEqualTo("relevance");
         assertThat(SearchController.normalizeSort("latest")).isEqualTo("latest");
+        assertThat(SearchController.normalizeSort("year")).isEqualTo("year");
         assertThat(SearchController.normalizeSort("douban")).isEqualTo("rating");
         assertThat(SearchController.normalizeSort("unsupported")).isEqualTo("relevance");
+
+        assertThat(SearchController.normalizeUserStatus(null)).isEqualTo("all");
+        assertThat(SearchController.normalizeUserStatus(" WATCHED ")).isEqualTo("watched");
+        assertThatThrownBy(() -> SearchController.normalizeUserStatus("unknown"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("userStatus");
     }
 
     @Test
@@ -110,8 +117,8 @@ class SearchControllerContractTest {
         when(movieService.list(any(Wrapper.class))).thenReturn(List.of(movie));
 
         SearchController controller = controller(movieService);
-        Result<?> response = controller.search("编剧甲", 1, 20, "movie", null, null,
-                " 美国 ", " 剧情 ", " 英语 ", null, "relevance", "desc");
+        Result<?> response = controller.search(null, "编剧甲", 1, 20, "movie", null, null,
+                " 美国 ", " 剧情 ", " 英语 ", null, "all", "relevance", "desc");
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Wrapper<Movie>> wrapper = (ArgumentCaptor<Wrapper<Movie>>) (ArgumentCaptor<?>)
@@ -232,7 +239,8 @@ class SearchControllerContractTest {
         when(shortDramaService.page(any(Page.class), any(Wrapper.class))).thenReturn(new Page<>());
         return new SearchController(movieService, dramaService, varietyService, animeService, shortDramaService,
                 mock(org.springframework.jdbc.core.JdbcTemplate.class),
-                mock(ContentResourceFilter.class));
+                mock(ContentResourceFilter.class),
+                mock(com.filmforest.content.service.UserMovieListService.class));
     }
 
     private void initialize(Class<?> entityType, String namespace) {

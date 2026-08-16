@@ -54,6 +54,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         // 放行公开接口
         if (isPublicRequest(request)) {
+            // 公开读取接口仍保持匿名可用；如果请求携带有效 JWT，仅补充用户上下文，
+            // 供搜索等可选的个性化筛选使用。无效 token 不改变公开接口的匿名语义。
+            authenticateOptional(request);
             filterChain.doFilter(request, response);
             return;
         }
@@ -92,6 +95,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void authenticateOptional(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return;
+        }
+
+        try {
+            Claims claims = jwtUtil.parseToken(authHeader.substring(7));
+            Long userId = Long.parseLong(claims.getSubject());
+            User user = userService.getById(userId);
+            if (user == null || !Integer.valueOf(1).equals(user.getStatus())
+                    || Integer.valueOf(1).equals(user.getDeleted())) {
+                return;
+            }
+            request.setAttribute("userId", user.getId());
+            request.setAttribute("username", user.getUsername());
+            request.setAttribute("role", user.getRole());
+        } catch (JwtException | IllegalArgumentException ignored) {
+            // Public GET remains anonymously readable when an optional token is invalid.
+        }
     }
 
     boolean isPublicRequest(HttpServletRequest request) {

@@ -4,12 +4,15 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.common.dto.Result;
+import com.filmforest.content.dto.ContentStatusQuery;
+import com.filmforest.content.dto.ContentStatusResult;
 import com.filmforest.content.dto.PageResult;
 import com.filmforest.content.entity.*;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import com.filmforest.content.service.*;
 import lombok.extern.slf4j.Slf4j;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,6 +35,7 @@ public class SearchController {
     private final ShortDramaService shortDramaService;
     private final JdbcTemplate jdbcTemplate;
     private final ContentResourceFilter contentResourceFilter;
+    private final UserMovieListService userMovieListService;
 
     public SearchController(MovieService movieService,
                             DramaService dramaService,
@@ -39,7 +43,8 @@ public class SearchController {
                             AnimeService animeService,
                             ShortDramaService shortDramaService,
                             JdbcTemplate jdbcTemplate,
-                            ContentResourceFilter contentResourceFilter) {
+                            ContentResourceFilter contentResourceFilter,
+                            UserMovieListService userMovieListService) {
         this.movieService = movieService;
         this.dramaService = dramaService;
         this.varietyService = varietyService;
@@ -47,6 +52,7 @@ public class SearchController {
         this.shortDramaService = shortDramaService;
         this.jdbcTemplate = jdbcTemplate;
         this.contentResourceFilter = contentResourceFilter;
+        this.userMovieListService = userMovieListService;
     }
 
     /**
@@ -197,6 +203,7 @@ public class SearchController {
      */
     @GetMapping
     public Result<?> search(
+            HttpServletRequest request,
             @RequestParam String keyword,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -207,6 +214,7 @@ public class SearchController {
             @RequestParam(required = false) String genre,
             @RequestParam(required = false) String language,
             @RequestParam(required = false) Boolean hasResource,
+            @RequestParam(defaultValue = "all") String userStatus,
             @RequestParam(defaultValue = "relevance") String sort,
             @RequestParam(defaultValue = "desc") String sortDir) {
 
@@ -217,8 +225,13 @@ public class SearchController {
         try {
             validateTagId(tagId);
             validateYear(year);
+            userStatus = normalizeUserStatus(userStatus);
         } catch (IllegalArgumentException invalid) {
             return Result.fail(400, invalid.getMessage());
+        }
+        Long userId = request == null ? null : (Long) request.getAttribute("userId");
+        if (!"all".equals(userStatus) && userId == null) {
+            return Result.fail(401, "按观看状态筛选需要登录");
         }
 
         String kw = keyword.trim();
@@ -233,32 +246,38 @@ public class SearchController {
         String normalizedGenre = normalizeFilter(genre);
         String normalizedLanguage = normalizeFilter(language);
         boolean desc = "desc".equalsIgnoreCase(sortDir);
-        log.debug("[Search] keyword={}, page={}, size={}, types={}, tagId={}, year={}, region={}, genre={}, language={}, hasResource={}, sort={}, sortDir={}",
+        boolean filterByUserStatus = !"all".equals(userStatus);
+        log.debug("[Search] keyword={}, page={}, size={}, types={}, tagId={}, year={}, region={}, genre={}, language={}, hasResource={}, userStatus={}, sort={}, sortDir={}",
                 kw, safePage, safeSize, selectedTypes, tagId, year, normalizedRegion, normalizedGenre,
-                normalizedLanguage, hasResource, normalizedSort, sortDir);
+                normalizedLanguage, hasResource, userStatus, normalizedSort, sortDir);
 
         List<SearchResult> allResults = new ArrayList<>();
 
         long total = 0;
         if (shouldSearch(ContentType.MOVIE, selectedTypes, tagId, tagMatches)) {
             total += searchMovies(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.MOVIE),
-                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, filterByUserStatus, allResults);
         }
         if (shouldSearch(ContentType.DRAMA, selectedTypes, tagId, tagMatches)) {
             total += searchDramas(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.DRAMA),
-                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, filterByUserStatus, allResults);
         }
         if (shouldSearch(ContentType.VARIETY, selectedTypes, tagId, tagMatches)) {
             total += searchVarieties(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.VARIETY),
-                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, filterByUserStatus, allResults);
         }
         if (shouldSearch(ContentType.ANIME, selectedTypes, tagId, tagMatches)) {
             total += searchAnimes(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.ANIME),
-                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, filterByUserStatus, allResults);
         }
         if (shouldSearch(ContentType.SHORT_DRAMA, selectedTypes, tagId, tagMatches)) {
             total += searchShortDramas(kw, perTableLimit, normalizedSort, desc, tagMatches.get(ContentType.SHORT_DRAMA),
-                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, allResults);
+                    year, normalizedRegion, normalizedGenre, normalizedLanguage, hasResource, filterByUserStatus, allResults);
+        }
+
+        if (filterByUserStatus) {
+            applyUserStatusFilter(allResults, userId, userStatus);
+            total = allResults.size();
         }
 
         Comparator<SearchResult> comparator = getSearchResultComparator(normalizedSort, desc, kw);
@@ -285,7 +304,7 @@ public class SearchController {
 
     private long searchMovies(String kw, long limit, String sort, boolean desc,
                               Set<Long> taggedContentIds, Integer year, String region,
-                              String genre, String language, Boolean hasResource,
+                              String genre, String language, Boolean hasResource, boolean filterByUserStatus,
                               List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Movie> wrapper = new LambdaQueryWrapper<Movie>()
@@ -300,7 +319,7 @@ public class SearchController {
             contentResourceFilter.apply(wrapper, ContentType.MOVIE, hasResource);
             List<Movie> records;
             long total;
-            if (isRelevanceSort(sort)) {
+            if (isRelevanceSort(sort) || filterByUserStatus) {
                 records = movieService.list(wrapper);
                 total = records.size();
             } else {
@@ -331,7 +350,7 @@ public class SearchController {
 
     private long searchDramas(String kw, long limit, String sort, boolean desc,
                               Set<Long> taggedContentIds, Integer year, String region,
-                              String genre, String language, Boolean hasResource,
+                              String genre, String language, Boolean hasResource, boolean filterByUserStatus,
                               List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Drama> wrapper = new LambdaQueryWrapper<Drama>()
@@ -346,7 +365,7 @@ public class SearchController {
             contentResourceFilter.apply(wrapper, ContentType.DRAMA, hasResource);
             List<Drama> records;
             long total;
-            if (isRelevanceSort(sort)) {
+            if (isRelevanceSort(sort) || filterByUserStatus) {
                 records = dramaService.list(wrapper);
                 total = records.size();
             } else {
@@ -376,7 +395,7 @@ public class SearchController {
 
     private long searchVarieties(String kw, long limit, String sort, boolean desc,
                                  Set<Long> taggedContentIds, Integer year, String region,
-                                 String genre, String language, Boolean hasResource,
+                                 String genre, String language, Boolean hasResource, boolean filterByUserStatus,
                                  List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Variety> wrapper = new LambdaQueryWrapper<Variety>()
@@ -391,7 +410,7 @@ public class SearchController {
             contentResourceFilter.apply(wrapper, ContentType.VARIETY, hasResource);
             List<Variety> records;
             long total;
-            if (isRelevanceSort(sort)) {
+            if (isRelevanceSort(sort) || filterByUserStatus) {
                 records = varietyService.list(wrapper);
                 total = records.size();
             } else {
@@ -421,7 +440,7 @@ public class SearchController {
 
     private long searchAnimes(String kw, long limit, String sort, boolean desc,
                               Set<Long> taggedContentIds, Integer year, String region,
-                              String genre, String language, Boolean hasResource,
+                              String genre, String language, Boolean hasResource, boolean filterByUserStatus,
                               List<SearchResult> results) {
         try {
             LambdaQueryWrapper<Anime> wrapper = new LambdaQueryWrapper<Anime>()
@@ -436,7 +455,7 @@ public class SearchController {
             contentResourceFilter.apply(wrapper, ContentType.ANIME, hasResource);
             List<Anime> records;
             long total;
-            if (isRelevanceSort(sort)) {
+            if (isRelevanceSort(sort) || filterByUserStatus) {
                 records = animeService.list(wrapper);
                 total = records.size();
             } else {
@@ -466,7 +485,7 @@ public class SearchController {
 
     private long searchShortDramas(String kw, long limit, String sort, boolean desc,
                                    Set<Long> taggedContentIds, Integer year, String region,
-                                   String genre, String language, Boolean hasResource,
+                                   String genre, String language, Boolean hasResource, boolean filterByUserStatus,
                                    List<SearchResult> results) {
         try {
             LambdaQueryWrapper<ShortDrama> wrapper = new LambdaQueryWrapper<ShortDrama>()
@@ -482,7 +501,7 @@ public class SearchController {
             contentResourceFilter.apply(wrapper, ContentType.SHORT_DRAMA, hasResource);
             List<ShortDrama> records;
             long total;
-            if (isRelevanceSort(sort)) {
+            if (isRelevanceSort(sort) || filterByUserStatus) {
                 records = shortDramaService.list(wrapper);
                 total = records.size();
             } else {
@@ -540,8 +559,17 @@ public class SearchController {
         if (sort == null || sort.isBlank()) return "relevance";
         return switch (sort.trim().toLowerCase(Locale.ROOT)) {
             case "latest" -> "latest";
+            case "year" -> "year";
             case "rating", "douban", "imdb", "rt" -> "rating";
             default -> "relevance";
+        };
+    }
+
+    static String normalizeUserStatus(String status) {
+        if (status == null || status.isBlank()) return "all";
+        return switch (status.trim().toLowerCase(Locale.ROOT)) {
+            case "all", "unwatched", "watched", "unlisted", "listed" -> status.trim().toLowerCase(Locale.ROOT);
+            default -> throw new IllegalArgumentException("userStatus 必须是 all、unwatched、watched、unlisted 或 listed");
         };
     }
 
@@ -549,6 +577,44 @@ public class SearchController {
         if (value == null) return null;
         String normalized = value.trim();
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private void applyUserStatusFilter(List<SearchResult> results, Long userId, String userStatus) {
+        if (results.isEmpty()) return;
+
+        Map<String, List<Map<String, Object>>> statusesByContent = new HashMap<>();
+        for (int from = 0; from < results.size(); from += 200) {
+            int to = Math.min(from + 200, results.size());
+            List<ContentStatusQuery> queries = results.subList(from, to).stream()
+                    .map(result -> new ContentStatusQuery(result.type(), result.id()))
+                    .toList();
+            for (ContentStatusResult result : userMovieListService.getContentStatusBatch(userId, queries)) {
+                statusesByContent.put(contentKey(result.contentType(), result.contentId()), result.statuses());
+            }
+        }
+
+        results.removeIf(result -> {
+            List<Map<String, Object>> statuses = statusesByContent.getOrDefault(
+                    contentKey(result.type(), result.id()), List.of());
+            boolean listed = statuses.stream().anyMatch(this::isAddedStatus);
+            boolean watched = statuses.stream().anyMatch(status ->
+                    isAddedStatus(status) && "watched".equals(String.valueOf(status.get("type"))));
+            return switch (userStatus) {
+                case "watched" -> !watched;
+                case "unwatched" -> watched;
+                case "listed" -> !listed;
+                case "unlisted" -> listed;
+                default -> false;
+            };
+        });
+    }
+
+    private boolean isAddedStatus(Map<String, Object> status) {
+        return Boolean.TRUE.equals(status.get("added"));
+    }
+
+    private String contentKey(String type, Long id) {
+        return type + ":" + id;
     }
 
     private <T> void applyKeyword(
