@@ -22,7 +22,8 @@ public class ResourceOnline {
     private Integer episodeNumber;   // 集号/期号
     private String episodeTitle;     // 集标题
 
-    private String sourceName;       // 来源名称
+    private String sourceName;       // 画质/线路内显示名称
+    private String providerName;     // 播放页动态线路名称
     private String sourceUrl;        // 播放URL
     private String sourcePageUrl;    // 来源站播放页
     private String playbackType;     // HLS/VIDEO/EMBED/EXTERNAL_PAGE

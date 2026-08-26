@@ -51,12 +51,14 @@ class PublicResourceViewTest {
         online.setSourceUrl("https://cdn.example.test/movie.m3u8");
         online.setSourcePageUrl("https://www.pkmp4.xyz/py/42-1-1.html");
         online.setPlaybackType("HLS");
+        online.setProviderName("非凡");
 
         PublicOnlineResource view = PublicOnlineResource.from(online);
 
         assertThat(view.sourceUrl()).isEqualTo("https://cdn.example.test/movie.m3u8");
         assertThat(view.sourcePageUrl()).isEqualTo("https://www.pkmp4.xyz/py/42-1-1.html");
         assertThat(view.playbackType()).isEqualTo("HLS");
+        assertThat(view.providerName()).isEqualTo("非凡");
     }
 
     private static PublicMagnetResource view(String title, String resolution, boolean subtitle) {

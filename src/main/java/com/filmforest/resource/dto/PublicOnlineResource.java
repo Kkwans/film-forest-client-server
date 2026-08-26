@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record PublicOnlineResource(
         Long id,
         String sourceName,
+        String providerName,
         String sourceUrl,
         String sourcePageUrl,
         String playbackType,
@@ -19,7 +20,7 @@ public record PublicOnlineResource(
 
     public static PublicOnlineResource from(ResourceOnline resource) {
         return new PublicOnlineResource(
-                resource.getId(), resource.getSourceName(), resource.getSourceUrl(),
+                resource.getId(), resource.getSourceName(), resource.getProviderName(), resource.getSourceUrl(),
                 resource.getSourcePageUrl(), resource.getPlaybackType(),
                 resource.getSeason(), resource.getEpisodeNumber(), resource.getEpisodeTitle(),
                 resource.getCreatedAt(), resource.getUpdatedAt());
