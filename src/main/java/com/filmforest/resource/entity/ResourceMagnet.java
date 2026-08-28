@@ -18,6 +18,7 @@ public class ResourceMagnet {
     private Long contentId;
     private String title;            // 资源标题（如"HD高清"）
     private String magnetUrl;        // 磁力链接
+    private Long sizeBytes;           // 来源页面声明的资源大小
     private String resolution;       // 分辨率（1080p/4K等）
     private Boolean hasSubtitle;     // 是否有字幕
     private Boolean isSpecialSub;    // 是否特效字幕

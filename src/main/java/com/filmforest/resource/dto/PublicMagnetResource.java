@@ -10,6 +10,7 @@ public record PublicMagnetResource(
         Long id,
         String title,
         String magnetUrl,
+        Long sizeBytes,
         String resolution,
         boolean hasSubtitle,
         boolean specialSubtitle,
@@ -25,7 +26,7 @@ public record PublicMagnetResource(
                 || hasSubtitleMarker(resource.getTitle());
         String resolution = normalizeResolution(resource.getResolution(), resource.getTitle());
         return new PublicMagnetResource(
-                resource.getId(), resource.getTitle(), resource.getMagnetUrl(), resolution,
+                resource.getId(), resource.getTitle(), resource.getMagnetUrl(), resource.getSizeBytes(), resolution,
                 subtitle, special, category(resolution, subtitle, special),
                 resource.getCreatedAt(), resource.getUpdatedAt());
     }
