@@ -41,6 +41,15 @@ public class UserMovieListController {
     }
 
     /**
+     * 获取默认片单轻量投影。该接口不会加载片单条目或内容详情，供卡片快速操作使用。
+     */
+    @GetMapping("/lists/defaults")
+    public Result<?> getDefaultLists(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return Result.ok(userMovieListService.getDefaultUserLists(userId));
+    }
+
+    /**
      * 创建自定义片单
      */
     @PostMapping("/lists")

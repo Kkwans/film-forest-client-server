@@ -49,6 +49,9 @@ class UserMovieListMixedStatusTest {
                 new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-test"),
                 UserMovieListItem.class);
         TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-list-test"),
+                UserMovieList.class);
+        TableInfoHelper.initTableInfo(
                 new MapperBuilderAssistant(new MybatisConfiguration(), "mixed-status-movie-test"),
                 Movie.class);
         TableInfoHelper.initTableInfo(
@@ -57,6 +60,26 @@ class UserMovieListMixedStatusTest {
         service = new UserMovieListServiceImpl(itemMapper, movieMapper, dramaMapper, varietyMapper,
                 animeMapper, shortDramaMapper, publishedContentAccessService);
         ReflectionTestUtils.setField(service, "baseMapper", listMapper);
+    }
+
+    @Test
+    void defaultListProjectionDoesNotLoadItems() {
+        UserMovieList want = new UserMovieList();
+        want.setId(3L);
+        want.setName("想看");
+        want.setType("want_to_watch");
+        UserMovieList watched = new UserMovieList();
+        watched.setId(4L);
+        watched.setName("看过");
+        watched.setType("watched");
+        when(listMapper.selectList(any(Wrapper.class))).thenReturn(List.of(want, watched));
+
+        var result = service.getDefaultUserLists(42L);
+
+        assertThat(result).containsExactly(
+                new com.filmforest.content.dto.UserDefaultListView(3L, "想看", "want_to_watch"),
+                new com.filmforest.content.dto.UserDefaultListView(4L, "看过", "watched"));
+        verify(listMapper).selectList(any(Wrapper.class));
     }
 
     @Test

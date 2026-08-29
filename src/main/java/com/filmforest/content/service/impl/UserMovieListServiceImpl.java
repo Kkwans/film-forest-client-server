@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
 import com.filmforest.content.dto.UserListItemVO;
+import com.filmforest.content.dto.UserDefaultListView;
 import com.filmforest.content.dto.ContentStatusQuery;
 import com.filmforest.content.dto.ContentStatusResult;
 import com.filmforest.content.entity.*;
@@ -92,6 +93,18 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
         }
 
         return lists;
+    }
+
+    @Override
+    public List<UserDefaultListView> getDefaultUserLists(Long userId) {
+        return list(new LambdaQueryWrapper<UserMovieList>()
+                .select(UserMovieList::getId, UserMovieList::getName, UserMovieList::getType)
+                .eq(UserMovieList::getUserId, userId)
+                .eq(UserMovieList::getIsDefault, 1)
+                .orderByAsc(UserMovieList::getId))
+                .stream()
+                .map(list -> new UserDefaultListView(list.getId(), list.getName(), list.getType()))
+                .toList();
     }
 
     @Override

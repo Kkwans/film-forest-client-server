@@ -3,6 +3,7 @@ package com.filmforest.content.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.spring.service.IService;
 import com.filmforest.content.dto.UserListItemVO;
+import com.filmforest.content.dto.UserDefaultListView;
 import com.filmforest.content.dto.ContentStatusQuery;
 import com.filmforest.content.dto.ContentStatusResult;
 import com.filmforest.content.entity.UserMovieList;
@@ -22,6 +23,11 @@ public interface UserMovieListService extends IService<UserMovieList> {
      * 获取用户所有片单
      */
     List<UserMovieList> getUserLists(Long userId);
+
+    /**
+     * 获取默认片单轻量投影，不加载条目和影视详情。
+     */
+    List<UserDefaultListView> getDefaultUserLists(Long userId);
 
     /**
      * 创建自定义片单
