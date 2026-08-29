@@ -29,6 +29,7 @@ class JwtAuthenticationFilterTest {
         assertThat(isPublic("GET", "/api/tags/hot")).isTrue();
         assertThat(isPublic("GET", "/api/movie/1/related")).isTrue();
         assertThat(isPublic("GET", "/api/recommend")).isTrue();
+        assertThat(isPublic("GET", "/api/catalog/counts")).isTrue();
     }
 
     @Test

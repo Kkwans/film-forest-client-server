@@ -33,7 +33,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/short-dramas",
             "/api/search",
             "/api/resources",
-            "/api/tags"
+            "/api/tags",
+            "/api/catalog"
     );
     private static final Pattern RELATED_PATH = Pattern.compile(
             "^/api/(movie|drama|anime|variety|short_drama)/\\d+/related$"
