@@ -11,6 +11,7 @@ import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
+import com.filmforest.content.model.ContentSort;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -57,12 +58,13 @@ public class VarietyServiceImpl extends ServiceImpl<VarietyMapper, Variety> impl
         contentTagLookupService.apply(wrapper, Variety::getId, tagId, ContentType.VARIETY);
         contentResourceFilter.apply(wrapper, ContentType.VARIETY, hasResource);
 
+        ContentSort contentSort = ContentSort.parse(sort, ContentType.VARIETY);
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
-        if ("douban".equals(sort)) {
+        if (contentSort == ContentSort.DOUBAN) {
             wrapper.orderBy(true, isAsc, Variety::getScoreDouban);
-        } else if ("imdb".equals(sort)) {
-            wrapper.orderBy(true, isAsc, Variety::getScoreDouban); // 综艺只有豆瓣
-        } else if ("year".equals(sort)) {
+        } else if (contentSort == ContentSort.IMDB) {
+            wrapper.orderBy(true, isAsc, Variety::getScoreImdb);
+        } else if (contentSort == ContentSort.YEAR) {
             wrapper.orderBy(true, isAsc, Variety::getYear);
         } else {
             wrapper.orderBy(true, isAsc, Variety::getUpdatedAt);

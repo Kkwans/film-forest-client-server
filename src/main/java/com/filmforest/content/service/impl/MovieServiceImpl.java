@@ -11,6 +11,7 @@ import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
+import com.filmforest.content.model.ContentSort;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -62,12 +63,15 @@ public class MovieServiceImpl extends ServiceImpl<MovieMapper, Movie> implements
         contentResourceFilter.apply(wrapper, ContentType.MOVIE, hasResource);
 
         // 排序
+        ContentSort contentSort = ContentSort.parse(sort, ContentType.MOVIE);
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
-        if ("douban".equals(sort)) {
+        if (contentSort == ContentSort.DOUBAN) {
             wrapper.orderBy(true, isAsc, Movie::getScoreDouban);
-        } else if ("imdb".equals(sort)) {
+        } else if (contentSort == ContentSort.IMDB) {
             wrapper.orderBy(true, isAsc, Movie::getScoreImdb);
-        } else if ("year".equals(sort)) {
+        } else if (contentSort == ContentSort.RT) {
+            wrapper.orderBy(true, isAsc, Movie::getScoreRt);
+        } else if (contentSort == ContentSort.YEAR) {
             wrapper.orderBy(true, isAsc, Movie::getYear);
         } else {
             // 默认按更新时间（最新更新）

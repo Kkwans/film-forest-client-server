@@ -11,6 +11,7 @@ import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
+import com.filmforest.content.model.ContentSort;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -57,12 +58,13 @@ public class AnimeServiceImpl extends ServiceImpl<AnimeMapper, Anime> implements
         contentTagLookupService.apply(wrapper, Anime::getId, tagId, ContentType.ANIME);
         contentResourceFilter.apply(wrapper, ContentType.ANIME, hasResource);
 
+        ContentSort contentSort = ContentSort.parse(sort, ContentType.ANIME);
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
-        if ("douban".equals(sort)) {
+        if (contentSort == ContentSort.DOUBAN) {
             wrapper.orderBy(true, isAsc, Anime::getScoreDouban);
-        } else if ("imdb".equals(sort)) {
-            wrapper.orderBy(true, isAsc, Anime::getScoreDouban);
-        } else if ("year".equals(sort)) {
+        } else if (contentSort == ContentSort.IMDB) {
+            wrapper.orderBy(true, isAsc, Anime::getScoreImdb);
+        } else if (contentSort == ContentSort.YEAR) {
             wrapper.orderBy(true, isAsc, Anime::getYear);
         } else {
             wrapper.orderBy(true, isAsc, Anime::getUpdatedAt);

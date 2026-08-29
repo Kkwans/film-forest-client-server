@@ -11,6 +11,7 @@ import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
+import com.filmforest.content.model.ContentSort;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -57,8 +58,13 @@ public class ShortDramaServiceImpl extends ServiceImpl<ShortDramaMapper, ShortDr
         contentTagLookupService.apply(wrapper, ShortDrama::getId, tagId, ContentType.SHORT_DRAMA);
         contentResourceFilter.apply(wrapper, ContentType.SHORT_DRAMA, hasResource);
 
+        ContentSort contentSort = ContentSort.parse(sort, ContentType.SHORT_DRAMA);
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
-        if ("year".equals(sort)) {
+        if (contentSort == ContentSort.DOUBAN) {
+            wrapper.orderBy(true, isAsc, ShortDrama::getScoreDouban);
+        } else if (contentSort == ContentSort.IMDB) {
+            wrapper.orderBy(true, isAsc, ShortDrama::getScoreImdb);
+        } else if (contentSort == ContentSort.YEAR) {
             wrapper.orderBy(true, isAsc, ShortDrama::getYear);
         } else {
             wrapper.orderBy(true, isAsc, ShortDrama::getUpdatedAt);

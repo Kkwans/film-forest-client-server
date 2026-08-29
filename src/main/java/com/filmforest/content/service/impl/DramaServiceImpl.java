@@ -11,6 +11,7 @@ import com.filmforest.content.service.ContentTagLookupService;
 import com.filmforest.content.service.ContentResourceFilter;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
+import com.filmforest.content.model.ContentSort;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -56,12 +57,13 @@ public class DramaServiceImpl extends ServiceImpl<DramaMapper, Drama> implements
         contentTagLookupService.apply(wrapper, Drama::getId, tagId, ContentType.DRAMA);
         contentResourceFilter.apply(wrapper, ContentType.DRAMA, hasResource);
 
+        ContentSort contentSort = ContentSort.parse(sort, ContentType.DRAMA);
         boolean isAsc = "asc".equalsIgnoreCase(sortDir);
-        if ("douban".equals(sort)) {
+        if (contentSort == ContentSort.DOUBAN) {
             wrapper.orderBy(true, isAsc, Drama::getScoreDouban);
-        } else if ("imdb".equals(sort)) {
+        } else if (contentSort == ContentSort.IMDB) {
             wrapper.orderBy(true, isAsc, Drama::getScoreImdb);
-        } else if ("year".equals(sort)) {
+        } else if (contentSort == ContentSort.YEAR) {
             wrapper.orderBy(true, isAsc, Drama::getYear);
         } else {
             wrapper.orderBy(true, isAsc, Drama::getUpdatedAt);
