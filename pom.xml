@@ -91,6 +91,13 @@
             <artifactId>commons-lang3</artifactId>
         </dependency>
 
+        <!-- 轻量本地缓存：首页推荐短 TTL，避免每次请求扫描五张内容表。 -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>3.2.4</version>
+        </dependency>
+
         <!-- Jsoup HTML解析（爬虫用） -->
         <dependency>
             <groupId>org.jsoup</groupId>

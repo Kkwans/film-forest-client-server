@@ -164,6 +164,15 @@ class SearchControllerContractTest {
     }
 
     @Test
+    void suggestionsSkipSingleCodePointQueriesBeforeTableScans() {
+        MovieService movieService = mock(MovieService.class);
+        SearchController controller = controller(movieService);
+
+        assertThat((List<?>) controller.suggest("导").getData()).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(movieService);
+    }
+
+    @Test
     void relevancePrefersExactTitleThenAliasAndGenre() {
         SearchController.SearchResult exact = result("史努比", null, null);
         SearchController.SearchResult alias = result("欢迎回家", "[\"史努比\"]", null);

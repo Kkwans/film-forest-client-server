@@ -11,9 +11,13 @@ import com.filmforest.content.entity.*;
 import com.filmforest.content.model.ContentType;
 import com.filmforest.content.model.ContentStatus;
 import com.filmforest.content.service.*;
+import com.filmforest.content.repository.SearchRepository;
 import lombok.extern.slf4j.Slf4j;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
@@ -36,7 +40,13 @@ public class SearchController {
     private final JdbcTemplate jdbcTemplate;
     private final ContentResourceFilter contentResourceFilter;
     private final UserMovieListService userMovieListService;
+    private final SearchRepository searchRepository;
+    private final Cache<String, List<String>> suggestCache = Caffeine.newBuilder()
+            .maximumSize(512)
+            .expireAfterWrite(java.time.Duration.ofSeconds(30))
+            .build();
 
+    @Autowired
     public SearchController(MovieService movieService,
                             DramaService dramaService,
                             VarietyService varietyService,
@@ -44,7 +54,8 @@ public class SearchController {
                             ShortDramaService shortDramaService,
                             JdbcTemplate jdbcTemplate,
                             ContentResourceFilter contentResourceFilter,
-                            UserMovieListService userMovieListService) {
+                            UserMovieListService userMovieListService,
+                            SearchRepository searchRepository) {
         this.movieService = movieService;
         this.dramaService = dramaService;
         this.varietyService = varietyService;
@@ -53,6 +64,20 @@ public class SearchController {
         this.jdbcTemplate = jdbcTemplate;
         this.contentResourceFilter = contentResourceFilter;
         this.userMovieListService = userMovieListService;
+        this.searchRepository = searchRepository;
+    }
+
+    /** 保留纯单元测试和旧集成装配使用的构造函数。 */
+    public SearchController(MovieService movieService,
+                            DramaService dramaService,
+                            VarietyService varietyService,
+                            AnimeService animeService,
+                            ShortDramaService shortDramaService,
+                            JdbcTemplate jdbcTemplate,
+                            ContentResourceFilter contentResourceFilter,
+                            UserMovieListService userMovieListService) {
+        this(movieService, dramaService, varietyService, animeService, shortDramaService,
+                jdbcTemplate, contentResourceFilter, userMovieListService, null);
     }
 
     /**
@@ -65,7 +90,14 @@ public class SearchController {
             return Result.ok(Collections.emptyList());
         }
         String kw = q.trim();
+        // Avoid five-table LIKE scans for single-character input; the full search endpoint
+        // remains available for deliberate one-character queries after submit.
+        if (kw.codePointCount(0, kw.length()) < 2) {
+            return Result.ok(Collections.emptyList());
+        }
         log.debug("[Search] suggest q={}", kw);
+        List<String> cached = suggestCache.getIfPresent(kw.toLowerCase(Locale.ROOT));
+        if (cached != null) return Result.ok(cached);
 
         int perTableLimit = 10;
         List<SuggestionCandidate> candidates = new ArrayList<>();
@@ -87,7 +119,9 @@ public class SearchController {
                 ShortDrama::getDirector, ShortDrama::getActor, ShortDrama::getStatus,
                 ContentType.SHORT_DRAMA.code(), kw, perTableLimit, candidates);
 
-        return Result.ok(orderSuggestionTitles(candidates, kw, 10));
+        List<String> result = orderSuggestionTitles(candidates, kw, 10);
+        suggestCache.put(kw.toLowerCase(Locale.ROOT), result);
+        return Result.ok(result);
     }
 
     /** 热门搜索：基于真实搜索日志聚合近 30 天关键词。 */
@@ -241,7 +275,6 @@ public class SearchController {
         long from = (safePage - 1L) * safeSize;
         long perTableLimit = from + safeSize;
         Set<ContentType> selectedTypes = parseTypeFilter(typeFilter);
-        Map<ContentType, Set<Long>> tagMatches = loadTagMatches(tagId, selectedTypes);
         String normalizedRegion = normalizeFilter(region);
         String normalizedGenre = normalizeFilter(genre);
         String normalizedLanguage = normalizeFilter(language);
@@ -250,6 +283,17 @@ public class SearchController {
         log.debug("[Search] keyword={}, page={}, size={}, types={}, tagId={}, year={}, region={}, genre={}, language={}, hasResource={}, userStatus={}, sort={}, sortDir={}",
                 kw, safePage, safeSize, selectedTypes, tagId, year, normalizedRegion, normalizedGenre,
                 normalizedLanguage, hasResource, userStatus, normalizedSort, sortDir);
+
+        if (searchRepository != null) {
+            SearchRepository.SearchPage searchPage = searchRepository.search(
+                    kw, selectedTypes, tagId, year, normalizedRegion, normalizedGenre, normalizedLanguage,
+                    hasResource, userStatus, userId, normalizedSort, desc, safePage, safeSize);
+            recordSearchLog(kw, searchPage.total());
+            long pages = searchPage.total() == 0 ? 0 : (searchPage.total() + safeSize - 1) / safeSize;
+            return Result.ok(new PageResult<>(searchPage.records(), searchPage.total(), safeSize, safePage, pages));
+        }
+
+        Map<ContentType, Set<Long>> tagMatches = loadTagMatches(tagId, selectedTypes);
 
         List<SearchResult> allResults = new ArrayList<>();
 
@@ -288,16 +332,20 @@ public class SearchController {
                 .collect(Collectors.toList());
 
         // 记录搜索日志
-        try {
-            jdbcTemplate.update(
-                "INSERT INTO search_log (keyword, result_count, source, created_at) VALUES (?, ?, 'web', NOW())",
-                kw, total);
-        } catch (Exception e) {
-            log.warn("[Search] 记录搜索日志失败: {}", kw, e);
-        }
+        recordSearchLog(kw, total);
 
         long pages = total == 0 ? 0 : (total + safeSize - 1) / safeSize;
         return Result.ok(new PageResult<>(pageData, total, safeSize, safePage, pages));
+    }
+
+    private void recordSearchLog(String keyword, long resultCount) {
+        try {
+            jdbcTemplate.update(
+                    "INSERT INTO search_log (keyword, result_count, source, created_at) VALUES (?, ?, 'web', NOW(6))",
+                    keyword, resultCount);
+        } catch (Exception e) {
+            log.warn("[Search] 记录搜索日志失败: {}", keyword, e);
+        }
     }
 
     // ==================== 各类型搜索方法 ====================
@@ -560,7 +608,9 @@ public class SearchController {
         return switch (sort.trim().toLowerCase(Locale.ROOT)) {
             case "latest" -> "latest";
             case "year" -> "year";
-            case "rating", "douban", "imdb", "rt" -> "rating";
+            case "rating", "douban" -> "rating";
+            case "imdb" -> "imdb";
+            case "rt" -> "rt";
             default -> "relevance";
         };
     }
@@ -645,7 +695,7 @@ public class SearchController {
         });
     }
 
-    static boolean matchesTypeKeyword(ContentType contentType, String keyword) {
+    public static boolean matchesTypeKeyword(ContentType contentType, String keyword) {
         if (keyword == null) return false;
         String normalized = keyword.trim().toLowerCase(Locale.ROOT).replace('-', '_');
         return switch (contentType) {
@@ -657,7 +707,7 @@ public class SearchController {
         };
     }
 
-    static Integer parseKeywordYear(String keyword) {
+    public static Integer parseKeywordYear(String keyword) {
         if (keyword == null || !keyword.trim().matches("\\d{4}")) return null;
         int year = Integer.parseInt(keyword.trim());
         return year >= 1888 && year <= 9999 ? year : null;
