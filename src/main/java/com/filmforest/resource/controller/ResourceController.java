@@ -12,7 +12,6 @@ import com.filmforest.resource.service.ResourceCloudService;
 import com.filmforest.resource.service.ResourceMagnetService;
 import com.filmforest.resource.service.ResourceOnlineService;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,17 +24,20 @@ import java.util.List;
 @RequestMapping("/api/resources")
 public class ResourceController {
 
-    @Autowired
-    private ResourceOnlineService resourceOnlineService;
+    private final ResourceOnlineService resourceOnlineService;
+    private final ResourceMagnetService resourceMagnetService;
+    private final ResourceCloudService resourceCloudService;
+    private final PublishedContentAccessService publishedContentAccessService;
 
-    @Autowired
-    private ResourceMagnetService resourceMagnetService;
-
-    @Autowired
-    private ResourceCloudService resourceCloudService;
-
-    @Autowired
-    private PublishedContentAccessService publishedContentAccessService;
+    public ResourceController(ResourceOnlineService resourceOnlineService,
+                              ResourceMagnetService resourceMagnetService,
+                              ResourceCloudService resourceCloudService,
+                              PublishedContentAccessService publishedContentAccessService) {
+        this.resourceOnlineService = resourceOnlineService;
+        this.resourceMagnetService = resourceMagnetService;
+        this.resourceCloudService = resourceCloudService;
+        this.publishedContentAccessService = publishedContentAccessService;
+    }
 
     // ==================== 在线播放资源 ====================
 
