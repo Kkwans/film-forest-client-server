@@ -244,6 +244,10 @@ public class RelatedServiceImpl implements RelatedService {
         vo.setYear(getIntField(item, "year"));
         BigDecimal score = getDecimalField(item, "scoreDouban");
         vo.setScoreDouban(score != null ? score.doubleValue() : null);
+        vo.setRegion(parseJsonArray(getField(item, "region")));
+        vo.setGenre(parseJsonArray(getField(item, "genre")));
+        vo.setDuration(getIntField(item, "duration"));
+        vo.setTotalEpisode(getIntField(item, "totalEpisode"));
         return vo;
     }
 

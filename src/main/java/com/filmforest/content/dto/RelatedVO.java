@@ -2,6 +2,8 @@ package com.filmforest.content.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 相关推荐 VO
  */
@@ -13,4 +15,8 @@ public class RelatedVO {
     private String posterUrl;
     private Integer year;
     private Double scoreDouban;
+    private List<String> region;
+    private List<String> genre;
+    private Integer duration;
+    private Integer totalEpisode;
 }
