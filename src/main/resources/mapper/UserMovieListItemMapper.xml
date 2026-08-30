@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.filmforest.content.mapper.UserMovieListItemMapper">
+
+    <sql id="visibleItems">
+        <if test="contentType == null or contentType == 'movie'">
+            SELECT i.id,
+                   i.list_id,
+                   i.movie_id,
+                   i.content_type,
+                   i.added_at,
+                   i.watched_at,
+                   c.title,
+                   c.poster_url AS cover,
+                   c.alias,
+                   c.year,
+                   c.score_douban AS rating,
+                   c.score_douban_count,
+                   c.score_imdb_count,
+                   c.score_rt_critic_count,
+                   c.score_rt_audience_count,
+                   c.region,
+                   c.genre,
+                   c.director,
+                   c.writer,
+                   c.actor,
+                   c.release_date,
+                   c.duration,
+                   NULL AS total_episode,
+                   i.rating AS user_rating,
+                   i.note
+              FROM user_movie_list_item i
+              JOIN movie c ON c.id = i.movie_id
+                          AND c.status = 1
+                          AND c.is_deleted = 0
+             WHERE i.list_id = #{listId}
+               AND i.content_type = 'movie'
+        </if>
+        <if test="contentType == null or contentType == 'drama'">
+            <if test="contentType == null or contentType == 'movie'">UNION ALL</if>
+            SELECT i.id,
+                   i.list_id,
+                   i.movie_id,
+                   i.content_type,
+                   i.added_at,
+                   i.watched_at,
+                   c.title,
+                   c.poster_url AS cover,
+                   c.alias,
+                   c.year,
+                   c.score_douban AS rating,
+                   c.score_douban_count,
+                   c.score_imdb_count,
+                   NULL AS score_rt_critic_count,
+                   NULL AS score_rt_audience_count,
+                   c.region,
+                   c.genre,
+                   c.director,
+                   c.writer,
+                   c.actor,
+                   c.release_date,
+                   c.duration,
+                   c.total_episode,
+                   i.rating AS user_rating,
+                   i.note
+              FROM user_movie_list_item i
+              JOIN drama c ON c.id = i.movie_id
+                          AND c.status = 1
+                          AND c.is_deleted = 0
+             WHERE i.list_id = #{listId}
+               AND i.content_type = 'drama'
+        </if>
+        <if test="contentType == null or contentType == 'variety'">
+            <if test="contentType == null or contentType == 'movie' or contentType == 'drama'">UNION ALL</if>
+            SELECT i.id,
+                   i.list_id,
+                   i.movie_id,
+                   i.content_type,
+                   i.added_at,
+                   i.watched_at,
+                   c.title,
+                   c.poster_url AS cover,
+                   c.alias,
+                   c.year,
+                   c.score_douban AS rating,
+                   c.score_douban_count,
+                   c.score_imdb_count,
+                   NULL AS score_rt_critic_count,
+                   NULL AS score_rt_audience_count,
+                   c.region,
+                   c.genre,
+                   c.director,
+                   c.writer,
+                   c.actor,
+                   c.release_date,
+                   c.duration,
+                   c.total_episode,
+                   i.rating AS user_rating,
+                   i.note
+              FROM user_movie_list_item i
+              JOIN variety c ON c.id = i.movie_id
+                           AND c.status = 1
+                           AND c.is_deleted = 0
+             WHERE i.list_id = #{listId}
+               AND i.content_type = 'variety'
+        </if>
+        <if test="contentType == null or contentType == 'anime'">
+            <if test="contentType == null or contentType == 'movie' or contentType == 'drama' or contentType == 'variety'">UNION ALL</if>
+            SELECT i.id,
+                   i.list_id,
+                   i.movie_id,
+                   i.content_type,
+                   i.added_at,
+                   i.watched_at,
+                   c.title,
+                   c.poster_url AS cover,
+                   c.alias,
+                   c.year,
+                   c.score_douban AS rating,
+                   c.score_douban_count,
+                   c.score_imdb_count,
+                   NULL AS score_rt_critic_count,
+                   NULL AS score_rt_audience_count,
+                   c.region,
+                   c.genre,
+                   c.director,
+                   c.writer,
+                   c.actor,
+                   c.release_date,
+                   c.duration,
+                   c.total_episode,
+                   i.rating AS user_rating,
+                   i.note
+              FROM user_movie_list_item i
+              JOIN anime c ON c.id = i.movie_id
+                          AND c.status = 1
+                          AND c.is_deleted = 0
+             WHERE i.list_id = #{listId}
+               AND i.content_type = 'anime'
+        </if>
+        <if test="contentType == null or contentType == 'short_drama'">
+            <if test="contentType == null or contentType == 'movie' or contentType == 'drama' or contentType == 'variety' or contentType == 'anime'">UNION ALL</if>
+            SELECT i.id,
+                   i.list_id,
+                   i.movie_id,
+                   i.content_type,
+                   i.added_at,
+                   i.watched_at,
+                   c.title,
+                   c.poster_url AS cover,
+                   c.alias,
+                   c.year,
+                   c.score_douban AS rating,
+                   c.score_douban_count,
+                   c.score_imdb_count,
+                   NULL AS score_rt_critic_count,
+                   NULL AS score_rt_audience_count,
+                   c.region,
+                   c.genre,
+                   c.director,
+                   c.writer,
+                   c.actor,
+                   c.release_date,
+                   c.duration,
+                   c.total_episode,
+                   i.rating AS user_rating,
+                   i.note
+              FROM user_movie_list_item i
+              JOIN short_drama c ON c.id = i.movie_id
+                          AND c.status = 1
+                          AND c.is_deleted = 0
+             WHERE i.list_id = #{listId}
+               AND i.content_type = 'short_drama'
+        </if>
+    </sql>
+
+    <select id="countVisible" resultType="long">
+        SELECT COUNT(*)
+          FROM (
+              <include refid="visibleItems"/>
+          ) visible
+    </select>
+
+    <select id="selectVisiblePage" resultType="com.filmforest.content.dto.UserListItemPageRow">
+        SELECT visible.*
+          FROM (
+              <include refid="visibleItems"/>
+          ) visible
+         ORDER BY
+         <choose>
+             <when test="sort == 'userRating'">visible.user_rating</when>
+             <when test="sort == 'year'">visible.year</when>
+             <when test="sort == 'douban'">visible.rating</when>
+             <otherwise>visible.added_at</otherwise>
+         </choose>
+         <choose>
+             <when test="desc">DESC</when>
+             <otherwise>ASC</otherwise>
+         </choose>,
+         visible.id
+         <choose>
+             <when test="desc">DESC</when>
+             <otherwise>ASC</otherwise>
+         </choose>
+         LIMIT #{limit} OFFSET #{offset}
+    </select>
+</mapper>

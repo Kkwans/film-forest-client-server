@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.filmforest.common.exception.BusinessException;
+import com.filmforest.content.dto.UserListItemPageRow;
 import com.filmforest.content.entity.Movie;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.entity.UserMovieListItem;
@@ -93,26 +94,28 @@ class UserMovieListVisibilityAndRatingTest {
     @Test
     void listPaginationAndTotalExcludeUnpublishedEntries() {
         when(listMapper.selectById(9L)).thenReturn(list("custom"));
-        UserMovieListItem visible = item(1L);
-        UserMovieListItem hidden = item(2L);
         LocalDateTime addedAt = LocalDateTime.of(2026, 8, 15, 1, 2, 3);
         LocalDateTime watchedAt = LocalDateTime.of(2026, 8, 15, 1, 3, 4);
+        UserListItemPageRow visible = new UserListItemPageRow();
+        visible.setId(1L);
+        visible.setListId(9L);
+        visible.setMovieId(1L);
+        visible.setContentType("movie");
         visible.setAddedAt(addedAt);
         visible.setWatchedAt(watchedAt);
-        when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of(visible, hidden));
-        Movie movie = new Movie();
-        movie.setId(1L);
-        movie.setTitle("已上线");
-        movie.setAlias("[\"别名\"]");
-        movie.setWriter("[\"编剧\"]");
-        movie.setDirector("[\"导演\"]");
-        movie.setActor("[\"演员\"]");
-        movie.setReleaseDate("2024-01-01");
-        movie.setScoreDoubanCount(100);
-        movie.setScoreImdbCount(200);
-        movie.setScoreRtCriticCount(12);
-        movie.setScoreRtAudienceCount(34);
-        when(movieMapper.selectList(any(Wrapper.class))).thenReturn(List.of(movie));
+        visible.setTitle("已上线");
+        visible.setAlias("[\"别名\"]");
+        visible.setWriter("[\"编剧\"]");
+        visible.setDirector("[\"导演\"]");
+        visible.setActor("[\"演员\"]");
+        visible.setReleaseDate("2024-01-01");
+        visible.setScoreDoubanCount(100);
+        visible.setScoreImdbCount(200);
+        visible.setScoreRtCriticCount(12);
+        visible.setScoreRtAudienceCount(34);
+        when(itemMapper.countVisible(9L, null)).thenReturn(1L);
+        when(itemMapper.selectVisiblePage(9L, null, "addedAt", true, 20, 0L))
+                .thenReturn(List.of(visible));
 
         var page = service.getListItems(42L, 9L, 1, 20, "addedAt", "desc", null);
 

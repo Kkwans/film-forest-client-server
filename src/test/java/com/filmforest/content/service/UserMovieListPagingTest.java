@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.filmforest.content.entity.UserMovieList;
 import com.filmforest.content.entity.UserMovieListItem;
+import com.filmforest.content.dto.UserListItemPageRow;
 import com.filmforest.content.mapper.AnimeMapper;
 import com.filmforest.content.mapper.DramaMapper;
 import com.filmforest.content.mapper.MovieMapper;
@@ -28,7 +29,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -62,26 +62,43 @@ class UserMovieListPagingTest {
 
     @Test
     void appliesContentTypeBeforeDatabasePagination() {
-        when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
+        when(itemMapper.countVisible(9L, "movie")).thenReturn(1L);
+        when(itemMapper.selectVisiblePage(9L, "movie", "addedAt", true, 20, 0L))
+                .thenReturn(List.of());
 
-        service.getListItems(42L, 9L, 1, 20, "addedAt", "desc", "movie");
+        var result = service.getListItems(42L, 9L, 1, 20, "addedAt", "desc", "movie");
 
-        ArgumentCaptor<LambdaQueryWrapper<UserMovieListItem>> wrapper = ArgumentCaptor.forClass(LambdaQueryWrapper.class);
-        verify(itemMapper).selectList(wrapper.capture());
-        wrapper.getValue().getSqlSegment();
-        assertThat(wrapper.getValue().getParamNameValuePairs().values()).contains(9L, "movie");
-        verify(itemMapper, never()).selectPage(any(Page.class), any(Wrapper.class));
+        assertThat(result.getTotal()).isEqualTo(1L);
+        assertThat(result.getRecords()).isEmpty();
+        verify(itemMapper).countVisible(9L, "movie");
+        verify(itemMapper).selectVisiblePage(9L, "movie", "addedAt", true, 20, 0L);
     }
 
     @Test
     void sortsCompleteFilteredSetBeforePagingForContentFields() {
-        when(itemMapper.selectList(any(Wrapper.class))).thenReturn(List.of());
+        UserListItemPageRow row = new UserListItemPageRow();
+        row.setId(17L);
+        row.setMovieId(71L);
+        row.setContentType("anime");
+        row.setTitle("分页结果");
+        when(itemMapper.countVisible(9L, "anime")).thenReturn(41L);
+        when(itemMapper.selectVisiblePage(9L, "anime", "year", true, 20, 20L))
+                .thenReturn(List.of(row));
 
         var result = service.getListItems(42L, 9L, 2, 20, "year", "desc", "anime");
 
         assertThat(result.getCurrent()).isEqualTo(2);
-        assertThat(result.getTotal()).isZero();
-        verify(itemMapper).selectList(any(Wrapper.class));
-        verify(itemMapper, never()).selectPage(any(Page.class), any(Wrapper.class));
+        assertThat(result.getTotal()).isEqualTo(41L);
+        assertThat(result.getRecords()).singleElement()
+                .satisfies(item -> assertThat(item.getMovieId()).isEqualTo(71L));
+        verify(itemMapper).selectVisiblePage(9L, "anime", "year", true, 20, 20L);
+    }
+
+    @Test
+    void rejectsUnknownSortInsteadOfFallingBackToAddedAt() {
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() ->
+                service.getListItems(42L, 9L, 1, 20, "title", "desc", null)))
+                .isInstanceOf(com.filmforest.common.exception.BusinessException.class)
+                .hasMessageContaining("不支持的片单排序方式");
     }
 }

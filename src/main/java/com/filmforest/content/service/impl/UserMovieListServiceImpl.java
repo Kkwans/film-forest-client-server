@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.spring.service.impl.ServiceImpl;
+import com.filmforest.content.dto.UserListItemPageRow;
 import com.filmforest.content.dto.UserListItemVO;
 import com.filmforest.content.dto.UserDefaultListView;
 import com.filmforest.content.dto.ContentStatusQuery;
@@ -255,51 +256,64 @@ public class UserMovieListServiceImpl extends ServiceImpl<UserMovieListMapper, U
             throw new RuntimeException("片单不存在");
         }
 
+        String normalizedSort = normalizeListSort(sort);
         boolean desc = "desc".equalsIgnoreCase(sortDir);
-        LambdaQueryWrapper<UserMovieListItem> baseQuery = new LambdaQueryWrapper<UserMovieListItem>()
-                .eq(UserMovieListItem::getListId, listId);
-        if (contentType != null && !contentType.isBlank()) {
-            baseQuery.eq(UserMovieListItem::getContentType, ContentType.parse(contentType).code());
-        }
+        int safePage = Math.max(pageNum, 1);
+        int safeSize = Math.max(pageSize, 1);
+        long offset = (long) (safePage - 1) * safeSize;
 
-        // 先过滤未上线内容，再对完整可见集合排序和分页，避免总数、页数或条目泄露草稿/下线内容。
-        List<UserListItemVO> voList = enrichItems(itemMapper.selectList(baseQuery));
+        // 先在数据库过滤已上线内容并统计完整可见集合，再只 enrich 当前页投影，
+        // 避免把整张片单加载到 JVM 后排序和切片。
+        long total = itemMapper.countVisible(listId, contentType);
+        List<UserListItemPageRow> rows = itemMapper.selectVisiblePage(
+                listId, contentType, normalizedSort, desc, safeSize, offset);
+        List<UserListItemVO> records = rows == null ? Collections.emptyList()
+                : rows.stream().map(this::toUserListItemVO).toList();
 
-        // 在 VO 层排序
-        voList.sort((a, b) -> {
-            int cmp = 0;
-            switch (sort) {
-                case "addedAt":
-                    cmp = Comparator.nullsFirst(Comparator.<OffsetDateTime>naturalOrder())
-                            .compare(a.getAddedAt(), b.getAddedAt());
-                    break;
-                case "userRating":
-                    cmp = Comparator.nullsFirst(Comparator.<BigDecimal>naturalOrder())
-                            .compare(a.getUserRating(), b.getUserRating());
-                    break;
-                case "year":
-                    int ya = a.getYear() != null ? a.getYear() : 0;
-                    int yb = b.getYear() != null ? b.getYear() : 0;
-                    cmp = Integer.compare(ya, yb);
-                    break;
-                case "douban":
-                    double da = a.getRating() != null ? a.getRating().doubleValue() : 0;
-                    double db = b.getRating() != null ? b.getRating().doubleValue() : 0;
-                    cmp = Double.compare(da, db);
-                    break;
-                default:
-                    cmp = Comparator.nullsFirst(Comparator.<OffsetDateTime>naturalOrder())
-                            .compare(a.getAddedAt(), b.getAddedAt());
-            }
-            return desc ? -cmp : cmp;
-        });
-
-        Page<UserListItemVO> voPage = new Page<>(pageNum, pageSize);
-        voPage.setTotal(voList.size());
-        int fromIndex = Math.min(Math.max(pageNum - 1, 0) * pageSize, voList.size());
-        int toIndex = Math.min(fromIndex + pageSize, voList.size());
-        voPage.setRecords(new ArrayList<>(voList.subList(fromIndex, toIndex)));
+        Page<UserListItemVO> voPage = new Page<>(safePage, safeSize, total);
+        voPage.setRecords(records);
         return voPage;
+    }
+
+    private String normalizeListSort(String sort) {
+        if (sort == null || sort.isBlank()) {
+            return "addedAt";
+        }
+        String normalized = sort.trim();
+        if (Set.of("addedAt", "userRating", "year", "douban").contains(normalized)) {
+            return normalized;
+        }
+        throw new BusinessException(400, "不支持的片单排序方式: " + sort);
+    }
+
+    private UserListItemVO toUserListItemVO(UserListItemPageRow row) {
+        UserListItemVO vo = new UserListItemVO();
+        vo.setId(row.getId());
+        vo.setListId(row.getListId());
+        vo.setMovieId(row.getMovieId());
+        vo.setContentType(row.getContentType());
+        vo.setAddedAt(toUtcOffset(row.getAddedAt()));
+        vo.setWatchedAt(toUtcOffset(row.getWatchedAt()));
+        vo.setTitle(row.getTitle());
+        vo.setCover(row.getCover());
+        vo.setAlias(row.getAlias());
+        vo.setYear(row.getYear());
+        vo.setRating(row.getRating());
+        vo.setScoreDoubanCount(row.getScoreDoubanCount());
+        vo.setScoreImdbCount(row.getScoreImdbCount());
+        vo.setScoreRtCriticCount(row.getScoreRtCriticCount());
+        vo.setScoreRtAudienceCount(row.getScoreRtAudienceCount());
+        vo.setRegion(row.getRegion());
+        vo.setGenre(row.getGenre());
+        vo.setDirector(row.getDirector());
+        vo.setWriter(row.getWriter());
+        vo.setActor(row.getActor());
+        vo.setReleaseDate(row.getReleaseDate());
+        vo.setDuration(row.getDuration());
+        vo.setTotalEpisode(row.getTotalEpisode());
+        vo.setUserRating(row.getUserRating());
+        vo.setNote(row.getNote());
+        return vo;
     }
 
     /**
